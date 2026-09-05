@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Mingrui Xu — 驾驶探索作品集（原型）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#17160f;
+    --paper:#f7f6f1;
+    --muted:#6b6858;
+    --line:rgba(23,22,15,0.12);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    overscroll-behavior:none; touch-action:none;
+    background:#8ecae6;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--ink);
+  }
+  #app{ position:fixed; inset:0; }
+  #app canvas{ display:block; width:100%; height:100%; }
+
+  /* ---------- loading ---------- */
+  #loading{
+    position:fixed; inset:0; z-index:50;
+    background:#8ecae6;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px;
+    transition:opacity .5s ease;
+  }
+  #loading.hidden{ opacity:0; pointer-events:none; }
+  #loading .mark{ font-family:'Fraunces',serif; font-size:22px; }
+  #loading .sub{ font-size:13px; color:rgba(23,22,15,0.55); }
+
+  /* ---------- HUD ---------- */
+  #hud-top{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:20px 22px; pointer-events:none;
+  }
+  #hud-top .brand{
+    font-family:'Fraunces',serif; font-size:17px;
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:6px 12px; border-radius:999px;
+    pointer-events:auto; cursor:pointer;
+    transition:background .15s ease;
+  }
+  #hud-top .brand:hover{ background:rgba(247,246,241,0.95); }
+  #hud-top .hint{
+    position:fixed; top:86px; right:22px;
+    font-size:12.5px; color:var(--ink);
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:7px 13px; border-radius:999px;
+    max-width:220px; text-align:right; line-height:1.5;
+    transition:opacity .6s ease;
+  }
+  #hud-top .hint.faded{ opacity:0; }
+
+  /* ---------- node labels ---------- */
+  #labels-layer{ position:fixed; inset:0; z-index:5; pointer-events:none; }
+  .node-label{
+    position:absolute; transform:translate(-50%,-100%);
+    padding:5px 11px; border-radius:8px;
+    background:rgba(247,246,241,0.88);
+    border-bottom:2.5px solid var(--c, #333);
+    font-size:12.5px; font-weight:500; white-space:nowrap;
+    opacity:0; will-change:transform,opacity;
+  }
+
+  /* ---------- joystick (touch only) ---------- */
+  #joystick{
+    display:none;
+    position:fixed; left:26px; bottom:26px; z-index:20;
+    width:118px; height:118px; border-radius:50%;
+    background:rgba(23,22,15,0.16);
+    border:1px solid rgba(247,246,241,0.5);
+    touch-action:none;
+  }
+  @media (pointer:coarse){
+    #joystick{ display:block; }
+  }
+  #joystick-knob{
+    position:absolute; left:50%; top:50%; width:52px; height:52px;
+    margin:-26px 0 0 -26px; border-radius:50%;
+    background:rgba(247,246,241,0.85);
+    box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  #reset-btn{
+    position:fixed; right:20px; bottom:26px; z-index:20;
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px;
+    background:rgba(247,246,241,0.85); color:var(--ink);
+    border:none; padding:10px 16px; border-radius:999px;
+    cursor:pointer;
+  }
+
+  /* ---------- quick-jump project list ---------- */
+  #quick-nav{ position:fixed; top:20px; right:22px; z-index:25; }
+  #quick-nav-toggle{
+    display:flex; align-items:center; gap:9px;
+    background:rgba(247,246,241,0.85); border:none;
+    padding:13px 22px; border-radius:999px;
+    font-family:'Space Grotesk',sans-serif; font-size:16px; color:var(--ink);
+    cursor:pointer;
+  }
+  #quick-nav-arrow{ display:inline-block; transition:transform .2s ease; font-size:17px; }
+  #quick-nav.open #quick-nav-arrow{ transform:rotate(180deg); }
+  #quick-nav-panel{
+    margin-top:8px; background:rgba(247,246,241,0.96);
+    border-radius:14px; overflow:hidden;
+    max-height:0; opacity:0; transition:max-height .25s ease, opacity .2s ease;
+    pointer-events:none;
+  }
+  #quick-nav.open #quick-nav-panel{ max-height:420px; opacity:1; pointer-events:auto; }
+  .quick-nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .quick-nav-item:last-child{ border-bottom:none; }
+  .quick-nav-item:hover{ background:rgba(23,22,15,0.05); }
+  .quick-nav-swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+
+  /* ---------- controls guide (hover / tap) ---------- */
+  #help-widget{ position:fixed; top:70px; left:18px; z-index:25; }
+  #help-btn{
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(247,246,241,0.85);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;
+    color:var(--ink); cursor:pointer; user-select:none;
+  }
+  #help-panel{
+    position:absolute; top:42px; left:0;
+    width:270px; max-width:calc(100vw - 36px);
+    background:rgba(247,246,241,0.97);
+    border-radius:14px; padding:16px 16px 14px;
+    box-shadow:0 14px 34px rgba(23,22,15,0.2);
+    opacity:0; transform:translateY(-8px);
+    pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  @media (pointer:fine){
+    #help-widget:hover #help-panel{ opacity:1; transform:translateY(0); pointer-events:auto; }
+  }
+  #help-widget.open #help-panel{ opacity:1; transform:translateY(0); pointer-events:auto; }
+  .guide-section{ margin-bottom:12px; }
+  .guide-section:last-child{ margin-bottom:0; }
+  .guide-label{ font-family:'Fraunces',serif; font-size:13.5px; margin-bottom:4px; }
+  .guide-text{ font-size:11.5px; line-height:1.5; margin-bottom:2px; color:var(--muted); }
+  .guide-text.en{ font-size:12px; }
+
+  /* ---------- prompt modal ---------- */
+  #prompt-modal{
+    position:fixed; inset:0; z-index:30;
+    display:flex; align-items:flex-start; justify-content:flex-start;
+    padding:66px 20px 0 22px;
+    transition:opacity .2s ease;
+  }
+  #prompt-modal.hidden{ opacity:0; pointer-events:none; }
+  .prompt-card{
+    width:320px; max-width:calc(100vw - 42px);
+    background:var(--paper);
+    border-radius:16px;
+    padding:22px 22px 18px;
+    border-top:4px solid var(--c,#333);
+    box-shadow:0 14px 34px rgba(23,22,15,0.2);
+    transform:translate(0,0);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  #prompt-modal.hidden .prompt-card{ transform:translate(-26px,-18px); }
+  .prompt-card .kicker{ font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .prompt-card h3{
+    font-family:'Fraunces',serif; font-weight:400; font-size:23px;
+    margin:0 0 14px;
+  }
+  .prompt-actions{ display:flex; gap:10px; }
+  .prompt-actions button{
+    flex:1; padding:11px 10px; border-radius:10px; border:none;
+    font-family:'Space Grotesk',sans-serif; font-weight:500;
+    cursor:pointer; text-align:center; line-height:1.3;
+  }
+  .prompt-actions .btn-cn{ display:block; font-size:10.5px; font-weight:400; opacity:0.72; margin-top:1px; }
+  .prompt-actions .btn-en{ display:block; font-size:14px; }
+  .btn-primary{ background:var(--c,#28428a); color:#fff; }
+  .btn-ghost{ background:transparent; color:var(--ink); border:1px solid var(--line) !important; }
+
+  /* ---------- detail panel ---------- */
+  #detail-panel{
+    position:fixed; inset:0; z-index:40;
+    background:var(--paper);
+    transform:translateX(100%);
+    transition:transform .38s cubic-bezier(.2,.8,.2,1);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  #detail-panel.open{ transform:translateX(0); }
+  .detail-hero{
+    height:34vh; min-height:200px; background:var(--c,#333);
+    display:flex; align-items:flex-end; padding:24px;
+  }
+  .detail-hero span{
+    font-size:12.5px; color:rgba(255,255,255,0.85);
+    background:rgba(0,0,0,0.18); padding:5px 11px; border-radius:999px;
+  }
+  .detail-body{ padding:28px 26px 60px; max-width:560px; }
+  .detail-body h2{
+    font-family:'Fraunces',serif; font-weight:400; font-size:34px; margin:0 0 6px;
+  }
+  .detail-body .year{ font-size:13px; color:var(--muted); margin-bottom:22px; }
+  .detail-body p{ font-size:16px; line-height:1.7; margin:0 0 16px; }
+  .detail-enter-btn{
+    display:none;
+    background:var(--ink); color:#fff; border:none;
+    padding:13px 22px; border-radius:999px;
+    font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:500;
+    cursor:pointer; margin-top:6px;
+  }
+  .back-btn{
+    position:fixed; top:18px; left:18px; z-index:41;
+    background:rgba(247,246,241,0.92); border:none; padding:10px 16px;
+    border-radius:999px; font-family:'Space Grotesk',sans-serif; font-size:13px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="mark">Mingrui Xu</div>
+  <div class="sub">正在加载场景…</div>
+</div>
+
+<div id="app"></div>
+<div id="labels-layer"></div>
+
+<header id="hud-top">
+  <div class="brand" id="brand-link">Mingrui Xu</div>
+  <div class="hint" id="hint">WASD / 方向键驾驶 · 空格变形<br>手机双击屏幕也能变形<br>靠近色块查看作品</div>
+</header>
+
+<div id="joystick"><div id="joystick-knob"></div></div>
+<button id="reset-btn">回到起点</button>
+
+<div id="quick-nav">
+  <button id="quick-nav-toggle"><span>Works</span><span id="quick-nav-arrow">⌄</span></button>
+  <div id="quick-nav-panel"></div>
+</div>
+
+<div id="help-widget">
+  <div id="help-btn">?</div>
+  <div id="help-panel">
+    <div class="guide-section">
+      <div class="guide-label">移动 · Move</div>
+      <div class="guide-text">WASD / 方向键驾驶；手机端使用左下角摇杆</div>
+      <div class="guide-text en">WASD / Arrow keys to drive — or the joystick (bottom-left) on mobile.</div>
+    </div>
+    <div class="guide-section">
+      <div class="guide-label">变形 · Transform</div>
+      <div class="guide-text">按空格键（手机双击屏幕）在越野车与飞机间变形；飞行时按住前进爬升，松开下降</div>
+      <div class="guide-text en">Press Space (or double-tap the screen on mobile) to transform between jeep and jet. Hold forward while flying to climb, release to descend.</div>
+    </div>
+  </div>
+</div>
+
+<div id="prompt-modal" class="hidden">
+  <div class="prompt-card" id="prompt-card">
+    <div class="kicker" id="prompt-medium">Medium</div>
+    <h3 id="prompt-title">Project</h3>
+    <div class="prompt-actions">
+      <button class="btn-ghost" id="prompt-cancel">
+        <span class="btn-cn">继续探索</span>
+        <span class="btn-en">Keep exploring</span>
+      </button>
+      <button class="btn-primary" id="prompt-confirm">
+        <span class="btn-cn">进去看看？</span>
+        <span class="btn-en">Take a look?</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="detail-panel">
+  <button class="back-btn" id="detail-back">← 返回地图</button>
+  <div class="detail-hero" id="detail-hero"><span id="detail-medium">Medium</span></div>
+  <div class="detail-body">
+    <h2 id="detail-title">Project</h2>
+    <div class="year" id="detail-year">2024</div>
+    <p id="detail-desc"></p>
+    <button id="detail-enter" class="detail-enter-btn">走进现场 · Walk in →</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Project data — edit this array to point nodes at real project
+  // pages / images. `color` drives the node, glow pad and detail panel.
+  // ---------------------------------------------------------------
+  var PROJECTS = [
+    { id:"little-detective", title:"Little Detective",  medium:"Game design, illustration",
+      year:"2024", color:0xE0912C, link:"little-detective.html",
+      desc:"一款轻推理向的小游戏，玩家在几个手绘风格的场景里寻找线索、拼凑出事件经过。" },
+    { id:"hide-and-seek",    title:"Hide and Seek",      medium:"Interactive, game design",
+      year:"2024", color:0x1FB6A6, link:"hide-and-seek.html",
+      desc:"一个捉迷藏玩法的互动小项目，重点在关卡的视线遮挡设计和躲藏时的节奏感。" },
+    { id:"beam-down",        title:"Beam Down",          medium:"Game design, technical art",
+      year:"2025", color:0x8E5CE0, link:"beam-down.html",
+      desc:"第三人称俯视角的 Boss Rush 游戏，主导设计了玩家成长系统，也参与了战斗机制、特效与关卡设计。" },
+    { id:"next-news",        title:"The Next News",      medium:"Product design, editorial",
+      year:"2023", color:0x3D5AFE, link:"next-news.html",
+      desc:"一款重新设计的新闻阅读产品，用更克制的排版和分类方式重新组织信息密度。" }
+  ];
+
+  var NODE_RADIUS = 34;
+  var TRIGGER_RADIUS = 5.6;
+  var AWARE_RADIUS = 13.5;
+  var EXIT_BUFFER = 2.2;
+  var PLAY_BOUND = 62;
+
+  PROJECTS.forEach(function(p, i){
+    var angle = (i / PROJECTS.length) * Math.PI * 2 - Math.PI / 2;
+    p.x = Math.cos(angle) * NODE_RADIUS;
+    p.z = Math.sin(angle) * NODE_RADIUS;
+    p.cssColor = "#" + p.color.toString(16).padStart(6, "0");
+  });
+
+  var ABOUT_RADIUS = 15, ABOUT_ANGLE = -Math.PI / 4;
+  var aboutData = {
+    id:"about", title:"Mingrui Xu", medium:"About",
+    year:"Game & Product Design", color:0x28428A, cssColor:"#28428A", link:"about.html",
+    desc:"游戏与产品设计师，平时在几个方向之间切换：小型互动/游戏原型、编辑类产品的信息设计，偶尔也做一些像这个驾驶版作品集一样『不太正经』的实验。",
+    x: Math.cos(ABOUT_ANGLE) * ABOUT_RADIUS,
+    z: Math.sin(ABOUT_ANGLE) * ABOUT_RADIUS
+  };
+
+  // ---------------------------------------------------------------
+  // Three.js setup
+  // ---------------------------------------------------------------
+  var container = document.getElementById("app");
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8ecae6);
+  scene.fog = new THREE.Fog(0x8ecae6, 65, 190);
+
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 500);
+  var CAM_OFFSET = new THREE.Vector3(0, 40, -31);
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xfff2d9, 0.65));
+  var sun = new THREE.DirectionalLight(0xfff6e0, 0.85);
+  sun.position.set(30, 46, 18);
+  scene.add(sun);
+
+  // ---------- ground ----------
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(380, 380, 1, 1),
+    new THREE.MeshStandardMaterial({ color:0x7FB069, flatShading:true })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // ---------- boundary mountains ----------
+  var mountainRockMats = [
+    new THREE.MeshStandardMaterial({ color:0x726B5C, flatShading:true }),
+    new THREE.MeshStandardMaterial({ color:0x685F52, flatShading:true }),
+    new THREE.MeshStandardMaterial({ color:0x7D7364, flatShading:true })
+  ];
+  var mountainSnowMat = new THREE.MeshStandardMaterial({ color:0xEDEAE1, flatShading:true });
+
+  var mountainsGroup = new THREE.Group();
+  var mountainCount = 56;
+  for (var mi = 0; mi < mountainCount; mi++){
+    var mAngle = (mi / mountainCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.09;
+    var mRadius = 64 + Math.random() * 20;
+    var mHeight = 16 + Math.random() * 18;
+    var mBase = 8 + Math.random() * 7;
+    var mx = Math.cos(mAngle) * mRadius, mz = Math.sin(mAngle) * mRadius;
+    var sx = 0.75 + Math.random() * 0.6, sz = 0.75 + Math.random() * 0.6;
+
+    var peak = new THREE.Mesh(
+      new THREE.ConeGeometry(mBase, mHeight, 6),
+      mountainRockMats[Math.floor(Math.random() * mountainRockMats.length)]
+    );
+    peak.position.set(mx, mHeight / 2, mz);
+    peak.rotation.y = Math.random() * Math.PI;
+    peak.scale.x = sx; peak.scale.z = sz;
+    mountainsGroup.add(peak);
+
+    if (mHeight > 23){
+      var snowH = mHeight * 0.34;
+      var cap = new THREE.Mesh(
+        new THREE.ConeGeometry(mBase * 0.4, snowH, 6),
+        mountainSnowMat
+      );
+      cap.position.set(mx, mHeight - snowH / 2, mz);
+      cap.rotation.y = peak.rotation.y;
+      cap.scale.x = sx; cap.scale.z = sz;
+      mountainsGroup.add(cap);
+    }
+  }
+  scene.add(mountainsGroup);
+
+  // ---------- paths from spawn to each node ----------
+  PROJECTS.concat([aboutData]).forEach(function(p){
+    var len = Math.hypot(p.x, p.z);
+    var ang = Math.atan2(p.x, p.z);
+    var path = new THREE.Mesh(
+      new THREE.BoxGeometry(3.6, 0.05, len),
+      new THREE.MeshStandardMaterial({ color:0xEFDFB0, flatShading:true })
+    );
+    path.position.set(p.x / 2, 0.025, p.z / 2);
+    path.rotation.y = ang;
+    scene.add(path);
+  });
+
+  // ---------- scattered low-poly props ----------
+  function makeTree(){
+    var g = new THREE.Group();
+    var trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.17, 0.9, 6),
+      new THREE.MeshStandardMaterial({ color:0x7a5233, flatShading:true })
+    );
+    trunk.position.y = 0.45;
+    var greens = [0x3F7D4F, 0x52A35A, 0x2E6E49];
+    var foliageColor = greens[Math.floor(Math.random()*greens.length)];
+    var foliage = new THREE.Mesh(
+      new THREE.ConeGeometry(0.85, 1.7, 6),
+      new THREE.MeshStandardMaterial({ color: foliageColor, flatShading:true })
+    );
+    foliage.position.y = 1.55;
+    g.add(trunk, foliage);
+    return { mesh:g, radius:0.5, color:foliageColor };
+  }
+  function makeRock(){
+    var greys = [0x9C9C94, 0xB7B7A8, 0x8C8C82];
+    var r = 0.35 + Math.random()*0.45;
+    var color = greys[Math.floor(Math.random()*greys.length)];
+    var m = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(r, 0),
+      new THREE.MeshStandardMaterial({ color:color, flatShading:true })
+    );
+    m.position.y = 0.3;
+    m.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    return { mesh:m, radius:r, color:color };
+  }
+
+  var propsGroup = new THREE.Group();
+  var propColliders = [];
+  var placed = 0, attempts = 0;
+  while (placed < 60 && attempts < 800) {
+    attempts++;
+    var a = Math.random() * Math.PI * 2;
+    var r0 = 9 + Math.random() * (PLAY_BOUND - 6);
+    var x = Math.cos(a) * r0, z = Math.sin(a) * r0;
+    var tooClose = PROJECTS.some(function(p){ return Math.hypot(x - p.x, z - p.z) < 8; });
+    if (Math.hypot(x - aboutData.x, z - aboutData.z) < 8) tooClose = true;
+    if (Math.hypot(x, z) < 9) tooClose = true;
+    if (tooClose) continue;
+    var built = Math.random() < 0.55 ? makeTree() : makeRock();
+    built.mesh.position.x = x; built.mesh.position.z = z;
+    var s = 0.75 + Math.random()*0.7;
+    built.mesh.scale.set(s, s, s);
+    propsGroup.add(built.mesh);
+    propColliders.push({ mesh:built.mesh, x:x, z:z, radius:built.radius * s, color:built.color, destroyed:false });
+    placed++;
+  }
+  scene.add(propsGroup);
+
+  // ---------- prop destruction ----------
+  var fragments = [];
+
+  function spawnFragments(x, y, z, color, count){
+    for (var i = 0; i < count; i++){
+      var size = 0.12 + Math.random() * 0.16;
+      var mat = new THREE.MeshStandardMaterial({ color:color, flatShading:true, transparent:true });
+      var frag = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), mat);
+      frag.position.set(x + (Math.random()-0.5)*0.4, y + Math.random()*0.3, z + (Math.random()-0.5)*0.4);
+      var ang = Math.random() * Math.PI * 2;
+      var spd = 2.5 + Math.random() * 3.5;
+      scene.add(frag);
+      fragments.push({
+        mesh:frag,
+        vel:new THREE.Vector3(Math.cos(ang)*spd, 4 + Math.random()*3, Math.sin(ang)*spd),
+        angVel:new THREE.Vector3((Math.random()-0.5)*9, (Math.random()-0.5)*9, (Math.random()-0.5)*9),
+        life:0.9, maxLife:0.9
+      });
+    }
+    if (fragments.length > 220){
+      fragments.splice(0, fragments.length - 220).forEach(function(f){
+        scene.remove(f.mesh); f.mesh.geometry.dispose(); f.mesh.material.dispose();
+      });
+    }
+  }
+
+  function updateFragments(dt){
+    for (var i = fragments.length - 1; i >= 0; i--){
+      var f = fragments[i];
+      f.vel.y -= 14 * dt;
+      f.mesh.position.addScaledVector(f.vel, dt);
+      if (f.mesh.position.y < 0.05){ f.mesh.position.y = 0.05; f.vel.y = 0; f.vel.x *= 0.85; f.vel.z *= 0.85; }
+      f.mesh.rotation.x += f.angVel.x * dt;
+      f.mesh.rotation.y += f.angVel.y * dt;
+      f.mesh.rotation.z += f.angVel.z * dt;
+      f.life -= dt;
+      f.mesh.material.opacity = Math.max(0, f.life / f.maxLife);
+      if (f.life <= 0){
+        scene.remove(f.mesh); f.mesh.geometry.dispose(); f.mesh.material.dispose();
+        fragments.splice(i, 1);
+      }
+    }
+  }
+
+  function destroyProp(p){
+    p.destroyed = true;
+    propsGroup.remove(p.mesh);
+    spawnFragments(p.x, 0.5, p.z, p.color, 6);
+    carState.speed *= 0.8;
+  }
+
+  function checkPropCollisions(){
+    for (var i = 0; i < propColliders.length; i++){
+      var p = propColliders[i];
+      if (p.destroyed) continue;
+      var d = Math.hypot(carState.x - p.x, carState.z - p.z);
+      if (d < p.radius + 0.95) destroyProp(p);
+    }
+  }
+
+  // ---------- node markers ----------
+  function makeGlowTexture(){
+    var size = 64;
+    var canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    var g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.7)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }
+  var glowTexture = makeGlowTexture();
+  var PARTICLE_COUNT = 16;
+
+  var nodeMarkers = [];
+  PROJECTS.forEach(function(p, i){
+    var group = new THREE.Group();
+    group.position.set(p.x, 0, p.z);
+
+    var pad = new THREE.Mesh(
+      new THREE.CircleGeometry(2.7, 8),
+      new THREE.MeshBasicMaterial({ color:p.color, transparent:true, opacity:0.32 })
+    );
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.y = 0.02;
+
+    var pedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.25, 0.55, 6),
+      new THREE.MeshStandardMaterial({ color:0xd9d4c4, flatShading:true })
+    );
+    pedestal.position.y = 0.3;
+
+    var gem = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.85, 0),
+      new THREE.MeshStandardMaterial({ color:p.color, flatShading:true, roughness:0.4 })
+    );
+    gem.position.y = 2.1;
+
+    var particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    var particleParams = [];
+    for (var pi = 0; pi < PARTICLE_COUNT; pi++){
+      particleParams.push({
+        radius: 0.6 + Math.random() * 1.0,
+        height: 1.0 + Math.random() * 2.6,
+        speed: 0.35 + Math.random() * 0.7,
+        phase: Math.random() * Math.PI * 2,
+        bobSpeed: 0.6 + Math.random() * 0.9,
+        bobAmp: 0.15 + Math.random() * 0.3
+      });
+    }
+    var particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    var particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+      size:0.34, map:glowTexture, color:p.color, transparent:true, opacity:0.9,
+      blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+    }));
+
+    group.add(pad, pedestal, gem, particles);
+    scene.add(group);
+
+    var label = document.createElement("div");
+    label.className = "node-label";
+    label.style.setProperty("--c", p.cssColor);
+    label.textContent = p.title;
+    document.getElementById("labels-layer").appendChild(label);
+
+    nodeMarkers.push({
+      project:p, group:group, gem:gem, label:label, phase:Math.random()*10,
+      particles:particles, particlePositions:particlePositions, particleParams:particleParams,
+      gemBaseY:2.1
+    });
+  });
+
+  // ---------- special "About" node (Mingrui Xu) ----------
+  (function(){
+    var group = new THREE.Group();
+    group.position.set(aboutData.x, 0, aboutData.z);
+
+    var pad = new THREE.Mesh(
+      new THREE.CircleGeometry(3.4, 10),
+      new THREE.MeshBasicMaterial({ color:aboutData.color, transparent:true, opacity:0.34 })
+    );
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.y = 0.02;
+
+    var pedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.3, 1.6, 0.7, 8),
+      new THREE.MeshStandardMaterial({ color:0xd9d4c4, flatShading:true })
+    );
+    pedestal.position.y = 0.35;
+
+    var gem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(1.05, 0),
+      new THREE.MeshStandardMaterial({ color:aboutData.color, flatShading:true, roughness:0.35 })
+    );
+    gem.position.y = 2.5;
+
+    var ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.55, 0.07, 6, 16),
+      new THREE.MeshStandardMaterial({ color:0xE8C468, flatShading:true, roughness:0.3 })
+    );
+    ring.position.y = 2.5;
+    ring.rotation.x = Math.PI / 2;
+
+    var count = PARTICLE_COUNT * 2;
+    var particlePositions = new Float32Array(count * 3);
+    var particleParams = [];
+    for (var pi = 0; pi < count; pi++){
+      particleParams.push({
+        radius: 0.9 + Math.random() * 1.7,
+        height: 1.0 + Math.random() * 3.6,
+        speed: 0.3 + Math.random() * 0.8,
+        phase: Math.random() * Math.PI * 2,
+        bobSpeed: 0.5 + Math.random() * 0.9,
+        bobAmp: 0.2 + Math.random() * 0.35
+      });
+    }
+    var particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    var particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+      size:0.4, map:glowTexture, color:0xE8C468, transparent:true, opacity:0.95,
+      blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+    }));
+
+    group.add(pad, pedestal, gem, ring, particles);
+    scene.add(group);
+
+    var label = document.createElement("div");
+    label.className = "node-label";
+    label.style.setProperty("--c", aboutData.cssColor);
+    label.textContent = aboutData.title;
+    document.getElementById("labels-layer").appendChild(label);
+
+    nodeMarkers.push({
+      project:aboutData, group:group, gem:gem, label:label, phase:Math.random()*10,
+      particles:particles, particlePositions:particlePositions, particleParams:particleParams,
+      ring:ring, gemBaseY:2.5
+    });
+  })();
+
+  // ---------- quick-jump project list ----------
+  var qnRoot = document.getElementById("quick-nav");
+  var qnToggle = document.getElementById("quick-nav-toggle");
+  var qnPanel = document.getElementById("quick-nav-panel");
+  PROJECTS.forEach(function(p, i){
+    var item = document.createElement("div");
+    item.className = "quick-nav-item";
+    item.innerHTML = '<span class="quick-nav-swatch" style="background:' + p.cssColor + '"></span><span>' + p.title + "</span>";
+    item.addEventListener("click", function(){
+      qnRoot.classList.remove("open");
+      openDetail(nodeMarkers[i]);
+    });
+    qnPanel.appendChild(item);
+  });
+  qnToggle.addEventListener("click", function(){ qnRoot.classList.toggle("open"); dismissHint(); });
+
+  // ---------- car: low-poly jeep + transformable jet ----------
+  var JEEP_GREEN = 0x51602F;
+  var JEEP_TRIM  = 0x2B2E22;
+  var WHEEL_R = 0.42;
+
+  var car = new THREE.Group();
+  var jeepModel = new THREE.Group();
+  var planeModel = new THREE.Group();
+  car.add(jeepModel, planeModel);
+  planeModel.visible = false;
+
+  var bodyMat = new THREE.MeshStandardMaterial({ color:JEEP_GREEN, flatShading:true });
+  var trimMat = new THREE.MeshStandardMaterial({ color:JEEP_TRIM, flatShading:true });
+  var seatMat = new THREE.MeshStandardMaterial({ color:0x3a3f2c, flatShading:true });
+
+  // tub / lower body
+  var tub = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.62, 3.6), bodyMat);
+  tub.position.y = 0.73;
+  jeepModel.add(tub);
+
+  // raised hood
+  var hood = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.28, 1.3), bodyMat);
+  hood.position.set(0, 1.18, 1.15);
+  jeepModel.add(hood);
+
+  // grille slats
+  for (var gi = -2; gi <= 2; gi++){
+    var slat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.32, 0.06), trimMat);
+    slat.position.set(gi * 0.19, 0.82, 1.91);
+    jeepModel.add(slat);
+  }
+
+  // headlights
+  var headGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.08, 8);
+  headGeo.rotateX(Math.PI / 2);
+  var headMat = new THREE.MeshBasicMaterial({ color:0xF2EDD9 });
+  [-0.58, 0.58].forEach(function(x){
+    var hl = new THREE.Mesh(headGeo, headMat);
+    hl.position.set(x, 0.84, 1.94);
+    jeepModel.add(hl);
+  });
+
+  // taillights
+  [-0.68, 0.68].forEach(function(x){
+    var tl = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.22, 0.07),
+      new THREE.MeshBasicMaterial({ color:0xC1432B })
+    );
+    tl.position.set(x, 0.78, -1.87);
+    jeepModel.add(tl);
+  });
+
+  // bumpers
+  var bumperF = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.16, 0.2), trimMat);
+  bumperF.position.set(0, 0.42, 2.0);
+  jeepModel.add(bumperF);
+  var bumperR = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.15, 0.18), trimMat);
+  bumperR.position.set(0, 0.4, -1.98);
+  jeepModel.add(bumperR);
+
+  // fender flares
+  [[-0.92, 1.15], [0.92, 1.15], [-0.92, -1.15], [0.92, -1.15]].forEach(function(pos){
+    var flare = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.56), trimMat);
+    flare.position.set(pos[0], 0.66, pos[1]);
+    jeepModel.add(flare);
+  });
+
+  // roll bars (front + rear hoops)
+  var barGeo = new THREE.CylinderGeometry(0.045, 0.045, 1, 6);
+  function addBar(parent, x1, y1, z1, x2, y2, z2){
+    var mid = new THREE.Vector3((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
+    var dir = new THREE.Vector3(x2 - x1, y2 - y1, z2 - z1);
+    var bar = new THREE.Mesh(barGeo, trimMat);
+    bar.scale.y = dir.length();
+    bar.position.copy(mid);
+    bar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    parent.add(bar);
+  }
+  [0.55, -0.85].forEach(function(hoopZ){
+    var top = 1.85;
+    addBar(jeepModel, -0.72, 1.05, hoopZ, -0.72, top, hoopZ);
+    addBar(jeepModel, 0.72, 1.05, hoopZ, 0.72, top, hoopZ);
+    addBar(jeepModel, -0.72, top, hoopZ, 0.72, top, hoopZ);
+  });
+
+  // seats
+  [-0.4, 0.4].forEach(function(x){
+    var seat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.12), seatMat);
+    seat.position.set(x, 0.98, -0.1);
+    jeepModel.add(seat);
+  });
+
+  // wheels (tire + hub grouped so both spin together)
+  var wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.34, 8);
+  wheelGeo.rotateZ(Math.PI / 2);
+  var wheelMat = new THREE.MeshStandardMaterial({ color:0x1c1c1c, flatShading:true });
+  var hubGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.37, 8);
+  hubGeo.rotateZ(Math.PI / 2);
+  var hubMat = new THREE.MeshStandardMaterial({ color:0x8a877c, flatShading:true });
+  var wheels = [];
+  [[-0.9, 1.15], [0.9, 1.15], [-0.9, -1.15], [0.9, -1.15]].forEach(function(pos){
+    var wGroup = new THREE.Group();
+    wGroup.add(new THREE.Mesh(wheelGeo, wheelMat), new THREE.Mesh(hubGeo, hubMat));
+    wGroup.position.set(pos[0], WHEEL_R, pos[1]);
+    jeepModel.add(wGroup);
+    wheels.push(wGroup);
+  });
+
+  // ---------- jet: nose, fuselage, canopy, wings, tails, pods ----------
+  var canopyMat = new THREE.MeshStandardMaterial({
+    color:0xCFE7EC, flatShading:true, transparent:true, opacity:0.8, roughness:0.15, metalness:0.15
+  });
+  var podMat = new THREE.MeshStandardMaterial({ color:0x9AA1A6, flatShading:true });
+  bodyMat.side = THREE.DoubleSide;
+
+  var noseGeo = new THREE.ConeGeometry(0.2, 0.9, 6);
+  noseGeo.rotateX(Math.PI / 2);
+  var nose = new THREE.Mesh(noseGeo, bodyMat);
+  nose.position.set(0, 0.75, 1.65);
+  planeModel.add(nose);
+
+  var fuseGeo = new THREE.CylinderGeometry(0.26, 0.17, 2.3, 6);
+  fuseGeo.rotateX(Math.PI / 2);
+  var fuselage = new THREE.Mesh(fuseGeo, bodyMat);
+  fuselage.position.set(0, 0.75, 0.05);
+  planeModel.add(fuselage);
+
+  var nozzleGeo = new THREE.CylinderGeometry(0.17, 0.11, 0.5, 6);
+  nozzleGeo.rotateX(Math.PI / 2);
+  var nozzle = new THREE.Mesh(nozzleGeo, trimMat);
+  nozzle.position.set(0, 0.75, -1.35);
+  planeModel.add(nozzle);
+
+  var canopy = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.75), canopyMat);
+  canopy.position.set(0, 1.1, 0.7);
+  canopy.rotation.x = -0.1;
+  planeModel.add(canopy);
+
+  function makeSweptPanel(span, thickness, chord, side){
+    var geo = new THREE.BoxGeometry(span, thickness, chord);
+    geo.translate(side * span / 2, 0, 0);
+    return geo;
+  }
+
+  function makeWingGeo(side){
+    var rootX = 0.2, rootFrontZ = 0.55, rootBackZ = -0.35;
+    var tipX = 2.0, tipFrontZ = -0.45, tipBackZ = -1.35;
+    var shape = new THREE.Shape();
+    shape.moveTo(side * rootX, rootFrontZ);
+    shape.lineTo(side * rootX, rootBackZ);
+    shape.lineTo(side * tipX, tipBackZ);
+    shape.lineTo(side * tipX, tipFrontZ);
+    shape.lineTo(side * rootX, rootFrontZ);
+    var geo = new THREE.ExtrudeGeometry(shape, { depth:0.07, bevelEnabled:false });
+    geo.rotateX(Math.PI / 2);
+    return geo;
+  }
+
+  [1, -1].forEach(function(side){
+    var wing = new THREE.Mesh(makeWingGeo(side), bodyMat);
+    wing.position.y = 0.78;
+    planeModel.add(wing);
+
+    var canard = new THREE.Mesh(makeSweptPanel(0.55, 0.05, 0.3, side), bodyMat);
+    canard.position.set(side * 0.24, 0.82, 1.0);
+    canard.rotation.y = side * 0.35;
+    planeModel.add(canard);
+
+    var strake = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.98), bodyMat);
+    strake.position.set(side * 0.22, 0.78, 0.33);
+    planeModel.add(strake);
+
+    var finGeo = new THREE.BoxGeometry(0.06, 0.85, 0.6);
+    finGeo.translate(0, 0.425, 0);
+    var fin = new THREE.Mesh(finGeo, bodyMat);
+    fin.position.set(side * 0.17, 1.0, -1.15);
+    fin.rotation.x = -0.35;
+    fin.rotation.z = side * 0.32;
+    planeModel.add(fin);
+
+    var pod = new THREE.Group();
+    var podBodyGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.5, 6);
+    podBodyGeo.rotateX(Math.PI / 2);
+    pod.add(new THREE.Mesh(podBodyGeo, podMat));
+    var podNoseGeo = new THREE.ConeGeometry(0.09, 0.22, 6);
+    podNoseGeo.rotateX(Math.PI / 2);
+    var podNose = new THREE.Mesh(podNoseGeo, podMat);
+    podNose.position.z = 0.36;
+    pod.add(podNose);
+    var podTailGeo = new THREE.ConeGeometry(0.09, 0.16, 6);
+    podTailGeo.rotateX(-Math.PI / 2);
+    var podTail = new THREE.Mesh(podTailGeo, podMat);
+    podTail.position.z = -0.33;
+    pod.add(podTail);
+    pod.position.set(side * 0.85, 0.42, -0.05);
+    planeModel.add(pod);
+  });
+
+  var shadowBlob = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8, 10),
+    new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.22 })
+  );
+  shadowBlob.rotation.x = -Math.PI / 2;
+  scene.add(shadowBlob);
+
+  scene.add(car);
+
+  // ---------------------------------------------------------------
+  // input
+  // ---------------------------------------------------------------
+  var keys = { fwd:false, back:false, left:false, right:false };
+  var flightMode = false;
+  var isTransforming = false;
+  var transformState = null;
+  var TRANSFORM_DURATION = 0.9;
+
+  function triggerTransform(){
+    if (isTransforming) return;
+    isTransforming = true;
+    transformState = { from: flightMode ? "plane" : "jeep", to: flightMode ? "jeep" : "plane", t:0, switched:false };
+  }
+
+  window.addEventListener("keydown", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = true; break;
+      case "s": case "S": case "ArrowDown": keys.back = true; break;
+      case "a": case "A": case "ArrowLeft": keys.left = true; break;
+      case "d": case "D": case "ArrowRight": keys.right = true; break;
+      case " ": case "Spacebar":
+        e.preventDefault();
+        triggerTransform();
+        break;
+    }
+    dismissHint();
+  });
+  window.addEventListener("keyup", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = false; break;
+      case "s": case "S": case "ArrowDown": keys.back = false; break;
+      case "a": case "A": case "ArrowLeft": keys.left = false; break;
+      case "d": case "D": case "ArrowRight": keys.right = false; break;
+    }
+  });
+
+  var joystick = document.getElementById("joystick");
+  var knob = document.getElementById("joystick-knob");
+  var joyVec = { x:0, y:0 };
+  var joyActive = false, joyId = null, joyBaseRect = null;
+
+  joystick.addEventListener("pointerdown", function(e){
+    joyActive = true; joyId = e.pointerId;
+    joyBaseRect = joystick.getBoundingClientRect();
+    joystick.setPointerCapture(e.pointerId);
+    updateJoy(e);
+    dismissHint();
+  });
+  joystick.addEventListener("pointermove", function(e){
+    if (joyActive && e.pointerId === joyId) updateJoy(e);
+  });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(evt){
+    joystick.addEventListener(evt, function(e){
+      if (e.pointerId !== joyId) return;
+      joyActive = false; joyVec.x = 0; joyVec.y = 0;
+      knob.style.transform = "translate(0px,0px)";
+    });
+  });
+  function updateJoy(e){
+    var cx = joyBaseRect.left + joyBaseRect.width/2;
+    var cy = joyBaseRect.top + joyBaseRect.height/2;
+    var dx = e.clientX - cx, dy = e.clientY - cy;
+    var max = joyBaseRect.width/2;
+    var dist = Math.min(Math.hypot(dx,dy), max);
+    var ang = Math.atan2(dy,dx);
+    var kx = Math.cos(ang)*dist, ky = Math.sin(ang)*dist;
+    knob.style.transform = "translate(" + kx + "px," + ky + "px)";
+    joyVec.x = kx/max;
+    joyVec.y = ky/max;
+  }
+
+  function dismissHint(){
+    var hint = document.getElementById("hint");
+    if (hint) hint.classList.add("faded");
+  }
+  setTimeout(dismissHint, 5000);
+
+  // double-tap/double-click on the canvas transforms the vehicle —
+  // the main way to trigger it on mobile, where there's no spacebar
+  var lastCanvasTap = 0;
+  renderer.domElement.addEventListener("pointerdown", function(e){
+    var now = Date.now();
+    if (now - lastCanvasTap < 320) {
+      lastCanvasTap = 0;
+      triggerTransform();
+      dismissHint();
+    } else {
+      lastCanvasTap = now;
+    }
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", function(){
+    carState.x = 0; carState.z = 0; carState.y = 0; carState.heading = 0; carState.speed = 0;
+    flightMode = false;
+    isTransforming = false;
+    transformState = null;
+    jeepModel.visible = true;
+    jeepModel.scale.setScalar(1);
+    planeModel.visible = false;
+    planeModel.scale.setScalar(1);
+    car.rotation.set(0, 0, 0);
+    car.position.y = 0;
+    propColliders.forEach(function(p){
+      if (p.destroyed){ propsGroup.add(p.mesh); p.destroyed = false; }
+    });
+    fragments.forEach(function(f){
+      scene.remove(f.mesh); f.mesh.geometry.dispose(); f.mesh.material.dispose();
+    });
+    fragments.length = 0;
+  });
+
+  // controls guide: tap-to-toggle on touch devices (desktop uses CSS hover)
+  var helpWidget = document.getElementById("help-widget");
+  var helpBtn = document.getElementById("help-btn");
+  if (window.matchMedia("(pointer: coarse)").matches){
+    helpBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      helpWidget.classList.toggle("open");
+    });
+    document.addEventListener("click", function(){
+      helpWidget.classList.remove("open");
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // state machine: driving / prompt / detail
+  // ---------------------------------------------------------------
+  var appMode = "driving";
+  var cooldownId = null;
+  var activeNode = null;
+
+  var promptModal = document.getElementById("prompt-modal");
+  var promptCard = document.getElementById("prompt-card");
+  var promptTitle = document.getElementById("prompt-title");
+  var promptMedium = document.getElementById("prompt-medium");
+  var promptConfirm = document.getElementById("prompt-confirm");
+  var promptCancel = document.getElementById("prompt-cancel");
+
+  var detailPanel = document.getElementById("detail-panel");
+  var detailHero = document.getElementById("detail-hero");
+  var detailTitle = document.getElementById("detail-title");
+  var detailMedium = document.getElementById("detail-medium");
+  var detailYear = document.getElementById("detail-year");
+  var detailDesc = document.getElementById("detail-desc");
+  var detailEnter = document.getElementById("detail-enter");
+  var detailBack = document.getElementById("detail-back");
+
+  function openPrompt(node){
+    activeNode = node;
+    promptCard.style.setProperty("--c", node.project.cssColor);
+    promptTitle.textContent = node.project.title;
+    promptMedium.textContent = node.project.medium;
+    promptModal.classList.remove("hidden");
+  }
+  function closePrompt(withCooldown){
+    promptModal.classList.add("hidden");
+    if (withCooldown && activeNode) cooldownId = activeNode.project.id;
+  }
+  promptCancel.addEventListener("click", function(){ closePrompt(true); });
+  promptConfirm.addEventListener("click", function(){
+    promptModal.classList.add("hidden");
+    openDetail(activeNode);
+  });
+
+  function openDetail(node){
+    appMode = "detail";
+    detailHero.style.background = node.project.cssColor;
+    detailMedium.textContent = node.project.medium;
+    detailTitle.textContent = node.project.title;
+    detailYear.textContent = node.project.year;
+    detailDesc.textContent = node.project.desc;
+    if (node.project.link){
+      detailEnter.style.display = "inline-block";
+      detailEnter.onclick = function(){ window.location.href = node.project.link; };
+    } else {
+      detailEnter.style.display = "none";
+      detailEnter.onclick = null;
+    }
+    detailPanel.classList.add("open");
+  }
+  detailBack.addEventListener("click", function(){
+    detailPanel.classList.remove("open");
+    if (activeNode) cooldownId = activeNode.project.id;
+    appMode = "driving";
+  });
+
+  document.getElementById("brand-link").addEventListener("click", function(){
+    activeNode = null;
+    openDetail({ project: aboutData });
+  });
+
+  // ---------------------------------------------------------------
+  // car physics
+  // ---------------------------------------------------------------
+  var carState = { x:0, z:0, y:0, heading:0, speed:0 };
+  var ACCEL = 30, MAX_SPEED = 21, MAX_REVERSE = 9, FRICTION = 16, BRAKE = 38, TURN_RATE = 2.5;
+  var MAX_ALT = 9, CLIMB_RATE = 4, DESCEND_RATE = 3.2;
+
+  function updateCar(dt){
+    var throttle = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
+    throttle += -joyVec.y;
+    throttle = Math.max(-1, Math.min(1, throttle));
+
+    var steer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    steer += joyVec.x;
+    steer = Math.max(-1, Math.min(1, steer));
+
+    if (throttle !== 0) {
+      if (carState.speed !== 0 && Math.sign(throttle) !== Math.sign(carState.speed)) {
+        carState.speed += throttle * BRAKE * dt;
+      } else {
+        carState.speed += throttle * ACCEL * dt;
+      }
+    } else {
+      var dec = Math.sign(carState.speed) * FRICTION * dt;
+      if (Math.abs(dec) > Math.abs(carState.speed)) carState.speed = 0;
+      else carState.speed -= dec;
+    }
+    var maxSpd = flightMode ? MAX_SPEED * 1.6 : MAX_SPEED;
+    carState.speed = Math.max(-MAX_REVERSE, Math.min(maxSpd, carState.speed));
+
+    var speedFactor = Math.max(0.15, Math.min(1, Math.abs(carState.speed) / maxSpd));
+    carState.heading -= steer * TURN_RATE * dt * speedFactor;
+
+    var fx = Math.sin(carState.heading), fz = Math.cos(carState.heading);
+    carState.x += fx * carState.speed * dt;
+    carState.z += fz * carState.speed * dt;
+
+    var distC = Math.hypot(carState.x, carState.z);
+    if (distC > PLAY_BOUND) {
+      var s = PLAY_BOUND / distC;
+      carState.x *= s; carState.z *= s;
+      carState.speed *= 0.55;
+    }
+
+    if (flightMode) {
+      if (throttle > 0.15) carState.y = Math.min(MAX_ALT, carState.y + CLIMB_RATE * dt);
+      else carState.y = Math.max(0, carState.y - DESCEND_RATE * dt);
+    } else {
+      carState.y = 0;
+    }
+
+    car.position.x = carState.x;
+    car.position.z = carState.z;
+    car.position.y = carState.y + Math.sin(elapsed * 10) * 0.02 * speedFactor;
+    car.rotation.y = carState.heading;
+    car.rotation.z = steer * speedFactor * (flightMode ? 0.32 : 0.14);
+    car.rotation.x = flightMode ? -throttle * 0.12 : 0;
+
+    wheels.forEach(function(w){ w.rotation.x += (carState.speed / WHEEL_R) * dt; });
+
+    shadowBlob.position.set(carState.x, 0.06, carState.z);
+    var shadowFade = Math.max(0.35, 1 - carState.y / MAX_ALT * 0.7);
+    shadowBlob.scale.setScalar(shadowFade);
+    shadowBlob.material.opacity = 0.22 * shadowFade;
+
+    if (carState.y < 1.6) checkPropCollisions();
+  }
+
+  function easeOutBack(x){
+    var c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+  }
+
+  function updateTransform(dt){
+    var ts = transformState;
+    ts.t = Math.min(TRANSFORM_DURATION, ts.t + dt);
+    var overallP = ts.t / TRANSFORM_DURATION;
+
+    car.rotation.y = carState.heading + overallP * Math.PI * 4;
+    car.rotation.z = Math.sin(overallP * Math.PI) * 0.3;
+    car.position.y = carState.y + Math.sin(overallP * Math.PI) * 0.7;
+
+    if (overallP < 0.5) {
+      var p = overallP / 0.5;
+      var fromGroup = ts.from === "jeep" ? jeepModel : planeModel;
+      fromGroup.scale.setScalar(Math.max(0.04, 1 - p));
+    } else {
+      if (!ts.switched){
+        var fromGroup2 = ts.from === "jeep" ? jeepModel : planeModel;
+        fromGroup2.visible = false;
+        fromGroup2.scale.setScalar(1);
+        flightMode = (ts.to === "plane");
+        if (ts.to === "jeep") carState.y = 0;
+        var toGroup = ts.to === "jeep" ? jeepModel : planeModel;
+        toGroup.visible = true;
+        toGroup.scale.setScalar(0.04);
+        spawnFragments(carState.x, carState.y + 0.8, carState.z, JEEP_GREEN, 10);
+        ts.switched = true;
+      }
+      var p2 = (overallP - 0.5) / 0.5;
+      var toGroup2 = ts.to === "jeep" ? jeepModel : planeModel;
+      toGroup2.scale.setScalar(Math.max(0.04, easeOutBack(p2)));
+    }
+
+    if (ts.t >= TRANSFORM_DURATION){
+      car.rotation.y = carState.heading;
+      car.rotation.z = 0;
+      car.position.y = carState.y;
+      var finalGroup = ts.to === "jeep" ? jeepModel : planeModel;
+      finalGroup.scale.setScalar(1);
+      transformState = null;
+      isTransforming = false;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // node proximity checks
+  // ---------------------------------------------------------------
+  function updateNodes(dt){
+    nodeMarkers.forEach(function(n){
+      n.gem.rotation.y += dt * 0.6;
+      n.gem.rotation.x += dt * 0.35;
+      n.gem.position.y = n.gemBaseY + Math.sin(elapsed * 1.4 + n.phase) * 0.22;
+      if (n.ring) n.ring.rotation.z += dt * 0.7;
+
+      for (var pi = 0; pi < n.particleParams.length; pi++){
+        var pp = n.particleParams[pi];
+        var ang = elapsed * pp.speed + pp.phase;
+        var py = pp.height + Math.sin(elapsed * pp.bobSpeed + pp.phase) * pp.bobAmp;
+        n.particlePositions[pi * 3] = Math.cos(ang) * pp.radius;
+        n.particlePositions[pi * 3 + 1] = py;
+        n.particlePositions[pi * 3 + 2] = Math.sin(ang) * pp.radius;
+      }
+      n.particles.geometry.attributes.position.needsUpdate = true;
+
+      var d = Math.hypot(carState.x - n.project.x, carState.z - n.project.z);
+
+      var op = d < AWARE_RADIUS
+        ? Math.max(0, Math.min(1, 1 - (d - TRIGGER_RADIUS) / (AWARE_RADIUS - TRIGGER_RADIUS)))
+        : 0;
+      n.label.style.opacity = op;
+
+      var v = new THREE.Vector3(n.project.x, 3.7, n.project.z);
+      v.project(camera);
+      if (v.z < 1) {
+        n.label.style.left = ((v.x * 0.5 + 0.5) * window.innerWidth) + "px";
+        n.label.style.top = ((-v.y * 0.5 + 0.5) * window.innerHeight) + "px";
+      } else {
+        n.label.style.opacity = 0;
+      }
+
+      if (appMode === "driving" && !isTransforming && carState.y < 1.6) {
+        if (d < TRIGGER_RADIUS) {
+          if (cooldownId !== n.project.id && activeNode !== n) openPrompt(n);
+        } else if (d > TRIGGER_RADIUS + EXIT_BUFFER) {
+          if (activeNode === n) {
+            promptModal.classList.add("hidden");
+            activeNode = null;
+          }
+          if (cooldownId === n.project.id) cooldownId = null;
+        }
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // camera + loop
+  // ---------------------------------------------------------------
+  var camPos = new THREE.Vector3(CAM_OFFSET.x, CAM_OFFSET.y, CAM_OFFSET.z);
+  var clock = new THREE.Clock();
+  var elapsed = 0;
+
+  function animate(){
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    elapsed += dt;
+
+    if (isTransforming) updateTransform(dt);
+    else if (appMode === "driving") updateCar(dt);
+
+    var desired = new THREE.Vector3(carState.x + CAM_OFFSET.x, CAM_OFFSET.y + carState.y, carState.z + CAM_OFFSET.z);
+    camPos.lerp(desired, 1 - Math.pow(0.001, dt));
+    camera.position.copy(camPos);
+    camera.lookAt(carState.x, 1.2 + carState.y, carState.z);
+    camera.updateMatrixWorld();
+
+    updateNodes(dt);
+    updateFragments(dt);
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener("resize", function(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  requestAnimationFrame(function(){
+    document.getElementById("loading").classList.add("hidden");
+    animate();
+  });
+
+})();
+</script>
+</body>
+</html>
