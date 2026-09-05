@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Little Detective — Mingrui Xu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#17160f;
+    --paper:#f7f6f1;
+    --muted:#6b6858;
+    --line:rgba(23,22,15,0.12);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    overscroll-behavior:none; touch-action:none;
+    background:#E9DFC9;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--ink);
+  }
+  #app{ position:fixed; inset:0; }
+  #app canvas{ display:block; width:100%; height:100%; }
+
+  #loading{
+    position:fixed; inset:0; z-index:50;
+    background:#E9DFC9;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px;
+    transition:opacity .5s ease;
+  }
+  #loading.hidden{ opacity:0; pointer-events:none; }
+  #loading .mark{ font-family:'Fraunces',serif; font-size:22px; }
+  #loading .sub{ font-size:13px; color:rgba(23,22,15,0.55); }
+
+  #hud-top{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:20px 22px; pointer-events:none;
+  }
+  #hud-top .left-group{ display:flex; flex-direction:column; gap:8px; }
+  #back-link{
+    font-family:'Space Grotesk',sans-serif; font-size:13px;
+    background:rgba(247,246,241,0.85); backdrop-filter:blur(6px);
+    padding:8px 14px; border-radius:999px;
+    pointer-events:auto; cursor:pointer; border:none; color:var(--ink);
+    width:fit-content;
+    transition:background .15s ease;
+  }
+  #back-link:hover{ background:rgba(247,246,241,0.98); }
+  #project-tag{
+    font-family:'Fraunces',serif; font-size:16px;
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:6px 12px; border-radius:999px;
+    width:fit-content;
+  }
+  #hud-top .hint{
+    position:fixed; top:20px; right:22px;
+    font-size:12.5px; color:var(--ink);
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:7px 13px; border-radius:999px;
+    max-width:220px; text-align:right; line-height:1.5;
+    transition:opacity .6s ease;
+  }
+  #hud-top .hint.faded{ opacity:0; }
+
+  #labels-layer{ position:fixed; inset:0; z-index:5; pointer-events:none; }
+  .node-label{
+    position:absolute; transform:translate(-50%,-100%);
+    padding:5px 11px; border-radius:8px;
+    background:rgba(247,246,241,0.88);
+    border-bottom:2.5px solid var(--c, #333);
+    font-size:12.5px; font-weight:500; white-space:nowrap;
+    opacity:0; will-change:transform,opacity;
+  }
+
+  #joystick{
+    display:none;
+    position:fixed; left:26px; bottom:26px; z-index:20;
+    width:118px; height:118px; border-radius:50%;
+    background:rgba(23,22,15,0.16);
+    border:1px solid rgba(247,246,241,0.5);
+    touch-action:none;
+  }
+  @media (pointer:coarse){ #joystick{ display:block; } }
+  #joystick-knob{
+    position:absolute; left:50%; top:50%; width:52px; height:52px;
+    margin:-26px 0 0 -26px; border-radius:50%;
+    background:rgba(247,246,241,0.85);
+    box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  #reset-btn{
+    position:fixed; right:20px; bottom:26px; z-index:20;
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px;
+    background:rgba(247,246,241,0.85); color:var(--ink);
+    border:none; padding:10px 16px; border-radius:999px;
+    cursor:pointer;
+  }
+
+  #quick-nav{ position:fixed; top:76px; right:22px; z-index:25; }
+  #quick-nav-toggle{
+    display:flex; align-items:center; gap:9px;
+    background:rgba(247,246,241,0.85); border:none;
+    padding:11px 18px; border-radius:999px;
+    font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--ink);
+    cursor:pointer;
+  }
+  #quick-nav-arrow{ display:inline-block; transition:transform .2s ease; font-size:15px; }
+  #quick-nav.open #quick-nav-arrow{ transform:rotate(180deg); }
+  #quick-nav-panel{
+    margin-top:8px; background:rgba(247,246,241,0.96);
+    border-radius:14px; overflow:hidden;
+    max-height:0; opacity:0; transition:max-height .25s ease, opacity .2s ease;
+    pointer-events:none;
+  }
+  #quick-nav.open #quick-nav-panel{ max-height:420px; opacity:1; pointer-events:auto; }
+  .quick-nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .quick-nav-item:last-child{ border-bottom:none; }
+  .quick-nav-item:hover{ background:rgba(23,22,15,0.05); }
+  .quick-nav-swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+
+  #prompt-modal{
+    position:fixed; inset:0; z-index:30;
+    display:flex; align-items:flex-start; justify-content:flex-start;
+    padding:120px 20px 0 22px;
+    transition:opacity .2s ease;
+  }
+  #prompt-modal.hidden{ opacity:0; pointer-events:none; }
+  .prompt-card{
+    width:320px; max-width:calc(100vw - 42px);
+    background:var(--paper);
+    border-radius:16px;
+    padding:22px 22px 18px;
+    border-top:4px solid var(--c,#333);
+    box-shadow:0 14px 34px rgba(23,22,15,0.2);
+    transform:translate(0,0);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  #prompt-modal.hidden .prompt-card{ transform:translate(-26px,-18px); }
+  .prompt-card .kicker{ font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .prompt-card h3{ font-family:'Fraunces',serif; font-weight:400; font-size:23px; margin:0 0 14px; }
+  .prompt-actions{ display:flex; gap:10px; }
+  .prompt-actions button{
+    flex:1; padding:11px 10px; border-radius:10px; border:none;
+    font-family:'Space Grotesk',sans-serif; font-weight:500;
+    cursor:pointer; text-align:center; line-height:1.3;
+  }
+  .prompt-actions .btn-cn{ display:block; font-size:10.5px; font-weight:400; opacity:0.72; margin-top:1px; }
+  .prompt-actions .btn-en{ display:block; font-size:14px; }
+  .btn-primary{ background:var(--c,#28428a); color:#fff; }
+  .btn-ghost{ background:transparent; color:var(--ink); border:1px solid var(--line) !important; }
+
+  #detail-panel{
+    position:fixed; inset:0; z-index:40;
+    background:var(--paper);
+    transform:translateX(100%);
+    transition:transform .38s cubic-bezier(.2,.8,.2,1);
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  #detail-panel.open{ transform:translateX(0); }
+  .detail-hero{ height:34vh; min-height:200px; background:var(--c,#333); display:flex; align-items:flex-end; padding:24px; }
+  .detail-hero span{ font-size:12.5px; color:rgba(255,255,255,0.85); background:rgba(0,0,0,0.18); padding:5px 11px; border-radius:999px; }
+  .detail-body{ padding:28px 26px 60px; max-width:560px; }
+  .detail-body h2{ font-family:'Fraunces',serif; font-weight:400; font-size:34px; margin:0 0 6px; }
+  .detail-body .year{ font-size:13px; color:var(--muted); margin-bottom:22px; }
+  .detail-body p{ font-size:16px; line-height:1.7; margin:0 0 16px; }
+  .back-btn{
+    position:fixed; top:18px; left:18px; z-index:41;
+    background:rgba(247,246,241,0.92); border:none; padding:10px 16px;
+    border-radius:999px; font-family:'Space Grotesk',sans-serif; font-size:13px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="mark">Little Detective</div>
+  <div class="sub">正在布置房子…</div>
+</div>
+
+<div id="app"></div>
+<div id="labels-layer"></div>
+
+<header id="hud-top">
+  <div class="left-group">
+    <button id="back-link">← Map</button>
+    <div id="project-tag">Little Detective</div>
+  </div>
+  <div class="hint" id="hint">WASD / 方向键行走<br>靠近家具上的光点查看介绍</div>
+</header>
+
+<div id="joystick"><div id="joystick-knob"></div></div>
+<button id="reset-btn">回到门口</button>
+
+<div id="quick-nav">
+  <button id="quick-nav-toggle"><span>Rooms</span><span id="quick-nav-arrow">⌄</span></button>
+  <div id="quick-nav-panel"></div>
+</div>
+
+<div id="prompt-modal" class="hidden">
+  <div class="prompt-card" id="prompt-card">
+    <div class="kicker" id="prompt-medium">Medium</div>
+    <h3 id="prompt-title">Section</h3>
+    <div class="prompt-actions">
+      <button class="btn-ghost" id="prompt-cancel">
+        <span class="btn-cn">继续探索</span>
+        <span class="btn-en">Keep exploring</span>
+      </button>
+      <button class="btn-primary" id="prompt-confirm">
+        <span class="btn-cn">进去看看？</span>
+        <span class="btn-en">Take a look?</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="detail-panel">
+  <button class="back-btn" id="detail-back">← 返回屋子</button>
+  <div class="detail-hero" id="detail-hero"><span id="detail-medium">Medium</span></div>
+  <div class="detail-body">
+    <h2 id="detail-title">Section</h2>
+    <div class="year" id="detail-year">2024</div>
+    <p id="detail-desc"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Section data — 5 nodes, each sitting on a piece of furniture
+  // in a different room of the house
+  // ---------------------------------------------------------------
+  var SECTIONS = [
+    { id:"case",        title:"The Case",      medium:"Case study", year:"2024", color:0xE0912C,
+      desc:"《Little Detective》的项目概览：一款轻推理向的小游戏，玩家在几个手绘风格的场景里寻找线索、拼凑出事件经过。",
+      x:0,  z:-10, gemY:1.2 },
+    { id:"clues",       title:"The Clues",     medium:"Research",   year:"2024", color:0xB8622E,
+      desc:"最早的线索来自对推理游戏玩家的访谈：大家想要的不是海量文本，而是几件真正关键的物证。",
+      x:6,  z:-8,  gemY:1.5 },
+    { id:"investigation", title:"The Investigation", medium:"Process", year:"2024", color:0x8B4A2B,
+      desc:"从案件大纲到关卡草图之间，反复调整了线索出现的顺序，让玩家能靠自己的推理串起真相，而不是被动接收答案。",
+      x:8,  z:8,   gemY:1.5 },
+    { id:"reveal",       title:"The Reveal",   medium:"UI, illustration", year:"2024", color:0xD4A24C,
+      desc:"最终揭晓真相的那一幕，用了手绘分镜的方式呈现，尽量避免冗长的文字说明。",
+      x:-9, z:-8,  gemY:1.2 },
+    { id:"feedback",     title:"Player Feedback", medium:"Outcome", year:"2024", color:0x6B3A2E,
+      desc:"小范围测试后，玩家最常见的反馈是想要更多案件——目前正在规划后续的案件包。",
+      x:-6, z:12,  gemY:1.6 }
+  ];
+  SECTIONS.forEach(function(s){ s.cssColor = "#" + s.color.toString(16).padStart(6, "0"); });
+
+  var TRIGGER_RADIUS = 2.6, AWARE_RADIUS = 6.5, EXIT_BUFFER = 1.2;
+  var ROOM_HALF_X = 13, ROOM_MIN_Z = -15, ROOM_MAX_Z = 15;
+
+  function wrapAngle(a){
+    return a - Math.PI * 2 * Math.floor((a + Math.PI) / (Math.PI * 2));
+  }
+
+  // ---------------------------------------------------------------
+  // three.js setup
+  // ---------------------------------------------------------------
+  var container = document.getElementById("app");
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xE9DFC9);
+  scene.fog = new THREE.Fog(0xE9DFC9, 24, 52);
+
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 300);
+  var CAM_OFFSET = new THREE.Vector3(0, 15.5, -12);
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xFCEFDD, 0.78));
+  var sun = new THREE.DirectionalLight(0xFFF3DA, 0.65);
+  sun.position.set(12, 22, 8);
+  scene.add(sun);
+
+  // ---------------------------------------------------------------
+  // floors — one tinted rectangle per room, tiling the interior
+  // ---------------------------------------------------------------
+  function makeFloor(w, d, x, z, color){
+    var f = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshStandardMaterial({ color:color, flatShading:true })
+    );
+    f.rotation.x = -Math.PI / 2;
+    f.position.set(x, 0, z);
+    scene.add(f);
+  }
+  makeFloor(6, 30, 0, 0, 0xC2B49A);       // hallway
+  makeFloor(10, 14, -8, -8, 0xBE9A6B);    // living room
+  makeFloor(10, 14, 8, -8, 0xD8D2C2);     // kitchen
+  makeFloor(10, 16, -8, 7, 0xB7A6C9);     // bedroom
+  makeFloor(10, 16, 8, 7, 0xA98F6B);      // study
+
+  var doormat = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.6, 1.0),
+    new THREE.MeshStandardMaterial({ color:0x7A5233, flatShading:true })
+  );
+  doormat.rotation.x = -Math.PI / 2;
+  doormat.position.set(0, 0.005, -14.3);
+  scene.add(doormat);
+
+  // ---------------------------------------------------------------
+  // walls — exterior (tall) + interior partitions (low, doll-house
+  // style, so the fixed camera can always see over them) with
+  // gaps left open for doorways
+  // ---------------------------------------------------------------
+  var wallMat = new THREE.MeshStandardMaterial({ color:0xF5EFE3, flatShading:true });
+  var windowMat = new THREE.MeshBasicMaterial({ color:0xBFD9E8, transparent:true, opacity:0.5 });
+
+  function wall(w, h, d, x, y, z){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    m.position.set(x, y, z);
+    scene.add(m);
+  }
+
+  // exterior (height 2.2)
+  wall(0.4, 2.2, 30, -ROOM_HALF_X, 1.1, 0);
+  wall(0.4, 2.2, 30, ROOM_HALF_X, 1.1, 0);
+  wall(26.4, 2.2, 0.4, 0, 1.1, ROOM_MAX_Z);
+  wall(10, 2.2, 0.4, -8, 1.1, ROOM_MIN_Z);
+  wall(10, 2.2, 0.4, 8, 1.1, ROOM_MIN_Z);
+
+  [-10, 10].forEach(function(x){
+    var win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.0, 2.4), windowMat);
+    win.position.set(x, 1.5, ROOM_MAX_Z - 0.05);
+    scene.add(win);
+  });
+
+  // interior partitions (height 1.4) — doll-house height so the
+  // camera always sees into every room
+  var IH = 1.4, IY = 0.7;
+  wall(0.25, IH, 6, -3, IY, -12);   // hallway/living, front half
+  wall(0.25, IH, 5, -3, IY, -3.5);  // hallway/living, back half (door gap between)
+  wall(0.25, IH, 6, 3, IY, -12);    // hallway/kitchen, front half
+  wall(0.25, IH, 5, 3, IY, -3.5);   // hallway/kitchen, back half
+  wall(0.25, IH, 5, -3, IY, 1.5);   // hallway/bedroom, front half
+  wall(0.25, IH, 8, -3, IY, 11);    // hallway/bedroom, back half (door gap between)
+  wall(0.25, IH, 5, 3, IY, 1.5);    // hallway/study, front half
+  wall(0.25, IH, 8, 3, IY, 11);     // hallway/study, back half
+  wall(10, IH, 0.25, -8, IY, -1);   // living/bedroom divider (solid)
+  wall(10, IH, 0.25, 8, IY, -1);    // kitchen/study divider (solid)
+
+  // ---------------------------------------------------------------
+  // furniture
+  // ---------------------------------------------------------------
+  var woodLight = new THREE.MeshStandardMaterial({ color:0xC9A876, flatShading:true });
+  var woodDark  = new THREE.MeshStandardMaterial({ color:0x6B4A32, flatShading:true });
+  var woodStudy = new THREE.MeshStandardMaterial({ color:0xA98F6B, flatShading:true });
+  var metalMat  = new THREE.MeshStandardMaterial({ color:0x3A3A3A, flatShading:true });
+  var screenMat = new THREE.MeshBasicMaterial({ color:0xBFD9E8 });
+
+  function box(w,h,d,mat,x,y,z){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.position.set(x,y,z);
+    scene.add(m);
+    return m;
+  }
+  function makeChair(x,z,color,facingZ){
+    var mat = new THREE.MeshStandardMaterial({ color:color, flatShading:true });
+    var dir = facingZ || 1;
+    box(0.4,0.06,0.4, mat, x,0.44,z);
+    box(0.4,0.42,0.06, mat, x, 0.63, z - dir*0.2);
+    box(0.03,0.44,0.03, metalMat, x,0.22,z);
+  }
+
+  // ---- living room ----
+  var sofaMat = new THREE.MeshStandardMaterial({ color:0x5C7C8A, flatShading:true });
+  box(1.0, 0.42, 2.6, sofaMat, -12.3, 0.21, -8);
+  box(0.25, 0.55, 2.6, sofaMat, -12.75, 0.42, -8);
+  box(1.0, 0.35, 0.25, sofaMat, -12.3, 0.35, -9.15);
+  box(1.0, 0.35, 0.25, sofaMat, -12.3, 0.35, -6.85);
+  box(1.3, 0.4, 0.7, woodLight, -9, 0.2, -8);           // coffee table (hosts "The Reveal")
+  var rug = new THREE.Mesh(new THREE.CircleGeometry(1.8, 16), new THREE.MeshStandardMaterial({ color:0xC17A5A, flatShading:true }));
+  rug.rotation.x = -Math.PI/2; rug.position.set(-9, 0.012, -8);
+  scene.add(rug);
+  box(1.0, 0.4, 0.4, woodDark, -8, 0.2, -14.3);         // TV stand
+  box(1.2, 0.7, 0.06, screenMat, -8, 0.75, -14.25);      // TV screen
+  box(0.4, 1.6, 1.0, woodDark, -12.5, 0.8, -2.6);       // bookshelf
+
+  // ---- kitchen ----
+  box(0.6, 0.85, 9, new THREE.MeshStandardMaterial({ color:0xE8E4D8, flatShading:true }), 12.5, 0.42, -8.5);
+  box(0.8, 1.6, 0.8, new THREE.MeshStandardMaterial({ color:0xEDEDED, flatShading:true }), 12.4, 0.8, -13.5);
+  box(1.3, 0.72, 1.3, woodLight, 6, 0.36, -8);          // kitchen table (hosts "The Clues")
+  makeChair(6, -6.9, 0x2B3A55, -1);
+  makeChair(6, -9.1, 0x2B3A55, 1);
+
+  // ---- study ----
+  box(1.4, 0.06, 0.7, woodStudy, 8, 0.72, 7.5);         // desk (hosts "The Investigation")
+  var legGeo = new THREE.CylinderGeometry(0.03,0.03,0.72,6);
+  [[-0.62,-0.28],[0.62,-0.28],[-0.62,0.28],[0.62,0.28]].forEach(function(p){
+    var leg = new THREE.Mesh(legGeo, metalMat);
+    leg.position.set(8+p[0], 0.36, 7.5+p[1]);
+    scene.add(leg);
+  });
+  box(0.1, 0.18, 0.1, metalMat, 8.5, 0.85, 7.3);        // desk lamp base
+  box(0.16, 0.05, 0.16, new THREE.MeshStandardMaterial({ color:0xE8C468, flatShading:true }), 8.5, 0.97, 7.15);
+  makeChair(8, 8.6, 0x4A4A4A, -1);
+  box(0.4, 1.7, 1.0, woodDark, 12.4, 0.85, 12.5);       // study bookshelf
+
+  // ---- bedroom ----
+  box(1.8, 0.5, 2.4, new THREE.MeshStandardMaterial({ color:0x8FA8B8, flatShading:true }), -12.2, 0.25, 7);
+  box(1.8, 0.4, 0.3, woodDark, -12.5, 0.4, 5.9);        // headboard
+  box(1.7, 0.15, 0.7, new THREE.MeshStandardMaterial({ color:0xEFE6D8, flatShading:true }), -12.2, 0.55, 6.1); // pillow
+  box(0.5, 0.5, 0.5, woodDark, -10.2, 0.25, 5.6);       // nightstand
+  box(1.3, 0.85, 0.55, woodLight, -6, 0.42, 12);        // dresser (hosts "Player Feedback")
+  box(0.8, 1.7, 0.6, woodDark, -12.4, 0.85, 13.6);      // wardrobe
+
+  // ---- hallway ----
+  box(1.0, 0.72, 0.35, woodLight, 0, 0.36, -10);        // console table (hosts "The Case")
+
+  // ---------------------------------------------------------------
+  // glow texture + node markers (on furniture)
+  // ---------------------------------------------------------------
+  function makeGlowTexture(){
+    var size = 64;
+    var canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    var g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.7)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }
+  var glowTexture = makeGlowTexture();
+  var PARTICLE_COUNT = 12;
+
+  var nodeMarkers = [];
+  SECTIONS.forEach(function(s){
+    var group = new THREE.Group();
+    group.position.set(s.x, 0, s.z);
+
+    var pad = new THREE.Mesh(
+      new THREE.CircleGeometry(1.1, 10),
+      new THREE.MeshBasicMaterial({ color:s.color, transparent:true, opacity:0.3 })
+    );
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.y = 0.02;
+
+    var gem = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.32, 0),
+      new THREE.MeshStandardMaterial({ color:s.color, flatShading:true, roughness:0.4 })
+    );
+    gem.position.y = s.gemY;
+
+    var particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    var particleParams = [];
+    for (var pi = 0; pi < PARTICLE_COUNT; pi++){
+      particleParams.push({
+        radius: 0.3 + Math.random() * 0.4,
+        height: s.gemY - 0.3 + Math.random() * 1.1,
+        speed: 0.35 + Math.random() * 0.7,
+        phase: Math.random() * Math.PI * 2,
+        bobSpeed: 0.6 + Math.random() * 0.9,
+        bobAmp: 0.1 + Math.random() * 0.16
+      });
+    }
+    var particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    var particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+      size:0.24, map:glowTexture, color:s.color, transparent:true, opacity:0.9,
+      blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+    }));
+
+    group.add(pad, gem, particles);
+    scene.add(group);
+
+    var label = document.createElement("div");
+    label.className = "node-label";
+    label.style.setProperty("--c", s.cssColor);
+    label.textContent = s.title;
+    document.getElementById("labels-layer").appendChild(label);
+
+    nodeMarkers.push({
+      project:s, gem:gem, label:label, phase:Math.random()*10,
+      particles:particles, particlePositions:particlePositions, particleParams:particleParams,
+      gemBaseY:s.gemY
+    });
+  });
+
+  var qnRoot = document.getElementById("quick-nav");
+  var qnToggle = document.getElementById("quick-nav-toggle");
+  var qnPanel = document.getElementById("quick-nav-panel");
+  SECTIONS.forEach(function(s, i){
+    var item = document.createElement("div");
+    item.className = "quick-nav-item";
+    item.innerHTML = '<span class="quick-nav-swatch" style="background:' + s.cssColor + '"></span><span>' + s.title + "</span>";
+    item.addEventListener("click", function(){
+      qnRoot.classList.remove("open");
+      openDetail(nodeMarkers[i]);
+    });
+    qnPanel.appendChild(item);
+  });
+  qnToggle.addEventListener("click", function(){ qnRoot.classList.toggle("open"); dismissHint(); });
+
+  document.getElementById("back-link").addEventListener("click", function(){
+    window.location.href = "index.html";
+  });
+
+  // ---------------------------------------------------------------
+  // player: low-poly little boy (~6 years old), t-shirt + shorts
+  // ---------------------------------------------------------------
+  var shirtMat = new THREE.MeshStandardMaterial({ color:0xE0912C, flatShading:true });
+  var shortsMat = new THREE.MeshStandardMaterial({ color:0x3D5A80, flatShading:true });
+  var hairMat = new THREE.MeshStandardMaterial({ color:0x4A3527, flatShading:true });
+  var shoeMat = new THREE.MeshStandardMaterial({ color:0xD64545, flatShading:true });
+  var skinMat = new THREE.MeshStandardMaterial({ color:0xE8B892, flatShading:true });
+
+  var player = new THREE.Group();
+
+  // legs: shorts up top, bare leg below, sneaker at the bottom —
+  // lengths sum to the hip height (0.42) so feet land on y=0
+  var shortsGeo = new THREE.BoxGeometry(0.14, 0.18, 0.14);
+  shortsGeo.translate(0, -0.09, 0);
+  var bareLegGeo = new THREE.BoxGeometry(0.10, 0.16, 0.10);
+  bareLegGeo.translate(0, -0.26, 0);
+  var pShoeGeo = new THREE.BoxGeometry(0.15, 0.08, 0.21);
+  pShoeGeo.translate(0, -0.38, 0.02);
+
+  var legL = new THREE.Group();
+  legL.position.set(-0.11, 0.42, 0);
+  legL.add(new THREE.Mesh(shortsGeo, shortsMat));
+  legL.add(new THREE.Mesh(bareLegGeo, skinMat));
+  legL.add(new THREE.Mesh(pShoeGeo, shoeMat));
+  player.add(legL);
+
+  var legR = new THREE.Group();
+  legR.position.set(0.11, 0.42, 0);
+  legR.add(new THREE.Mesh(shortsGeo, shortsMat));
+  legR.add(new THREE.Mesh(bareLegGeo, skinMat));
+  legR.add(new THREE.Mesh(pShoeGeo, shoeMat));
+  player.add(legR);
+
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.24), shirtMat);
+  torso.position.set(0, 0.57, 0);
+  player.add(torso);
+
+  // arms: short sleeve up top, bare forearm below (t-shirt, not a suit)
+  var sleeveGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  sleeveGeo.translate(0, -0.06, 0);
+  var forearmGeo = new THREE.BoxGeometry(0.09, 0.2, 0.09);
+  forearmGeo.translate(0, -0.22, 0);
+
+  var armL = new THREE.Group();
+  armL.position.set(-0.25, 0.70, 0);
+  armL.add(new THREE.Mesh(sleeveGeo, shirtMat));
+  armL.add(new THREE.Mesh(forearmGeo, skinMat));
+  player.add(armL);
+  var armR = new THREE.Group();
+  armR.position.set(0.25, 0.70, 0);
+  armR.add(new THREE.Mesh(sleeveGeo, shirtMat));
+  armR.add(new THREE.Mesh(forearmGeo, skinMat));
+  player.add(armR);
+
+  var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 0), skinMat);
+  head.position.set(0, 0.99, 0);
+  player.add(head);
+
+  var hair = new THREE.Mesh(new THREE.IcosahedronGeometry(0.20, 0), hairMat);
+  hair.scale.set(1, 0.55, 1);
+  hair.position.set(0, 1.09, -0.01);
+  player.add(hair);
+
+  var shadowBlob = new THREE.Mesh(
+    new THREE.CircleGeometry(0.34, 10),
+    new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.22 })
+  );
+  shadowBlob.rotation.x = -Math.PI / 2;
+  shadowBlob.position.y = 0.02;
+  player.add(shadowBlob);
+
+  scene.add(player);
+
+  // ---------------------------------------------------------------
+  // input
+  // ---------------------------------------------------------------
+  var keys = { fwd:false, back:false, left:false, right:false };
+  window.addEventListener("keydown", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = true; break;
+      case "s": case "S": case "ArrowDown": keys.back = true; break;
+      case "a": case "A": case "ArrowLeft": keys.left = true; break;
+      case "d": case "D": case "ArrowRight": keys.right = true; break;
+    }
+    dismissHint();
+  });
+  window.addEventListener("keyup", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = false; break;
+      case "s": case "S": case "ArrowDown": keys.back = false; break;
+      case "a": case "A": case "ArrowLeft": keys.left = false; break;
+      case "d": case "D": case "ArrowRight": keys.right = false; break;
+    }
+  });
+
+  var joystick = document.getElementById("joystick");
+  var knob = document.getElementById("joystick-knob");
+  var joyVec = { x:0, y:0 };
+  var joyActive = false, joyId = null, joyBaseRect = null;
+
+  joystick.addEventListener("pointerdown", function(e){
+    joyActive = true; joyId = e.pointerId;
+    joyBaseRect = joystick.getBoundingClientRect();
+    joystick.setPointerCapture(e.pointerId);
+    updateJoy(e);
+    dismissHint();
+  });
+  joystick.addEventListener("pointermove", function(e){
+    if (joyActive && e.pointerId === joyId) updateJoy(e);
+  });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(evt){
+    joystick.addEventListener(evt, function(e){
+      if (e.pointerId !== joyId) return;
+      joyActive = false; joyVec.x = 0; joyVec.y = 0;
+      knob.style.transform = "translate(0px,0px)";
+    });
+  });
+  function updateJoy(e){
+    var cx = joyBaseRect.left + joyBaseRect.width/2;
+    var cy = joyBaseRect.top + joyBaseRect.height/2;
+    var dx = e.clientX - cx, dy = e.clientY - cy;
+    var max = joyBaseRect.width/2;
+    var dist = Math.min(Math.hypot(dx,dy), max);
+    var ang = Math.atan2(dy,dx);
+    var kx = Math.cos(ang)*dist, ky = Math.sin(ang)*dist;
+    knob.style.transform = "translate(" + kx + "px," + ky + "px)";
+    joyVec.x = kx/max;
+    joyVec.y = ky/max;
+  }
+
+  function dismissHint(){
+    var hint = document.getElementById("hint");
+    if (hint) hint.classList.add("faded");
+  }
+  setTimeout(dismissHint, 5000);
+
+  var playerState = { x:0, z:-13, heading:0 };
+  var walkPhase = 0, walkBlend = 0;
+
+  document.getElementById("reset-btn").addEventListener("click", function(){
+    playerState.x = 0; playerState.z = -13; playerState.heading = 0;
+  });
+
+  // ---------------------------------------------------------------
+  // state machine: exploring / detail
+  // ---------------------------------------------------------------
+  var appMode = "exploring";
+  var cooldownId = null;
+  var activeNode = null;
+
+  var promptModal = document.getElementById("prompt-modal");
+  var promptCard = document.getElementById("prompt-card");
+  var promptTitle = document.getElementById("prompt-title");
+  var promptMedium = document.getElementById("prompt-medium");
+  var promptConfirm = document.getElementById("prompt-confirm");
+  var promptCancel = document.getElementById("prompt-cancel");
+
+  var detailPanel = document.getElementById("detail-panel");
+  var detailHero = document.getElementById("detail-hero");
+  var detailTitle = document.getElementById("detail-title");
+  var detailMedium = document.getElementById("detail-medium");
+  var detailYear = document.getElementById("detail-year");
+  var detailDesc = document.getElementById("detail-desc");
+  var detailBack = document.getElementById("detail-back");
+
+  function openPrompt(node){
+    activeNode = node;
+    promptCard.style.setProperty("--c", node.project.cssColor);
+    promptTitle.textContent = node.project.title;
+    promptMedium.textContent = node.project.medium;
+    promptModal.classList.remove("hidden");
+  }
+  function closePrompt(withCooldown){
+    promptModal.classList.add("hidden");
+    if (withCooldown && activeNode) cooldownId = activeNode.project.id;
+  }
+  promptCancel.addEventListener("click", function(){ closePrompt(true); });
+  promptConfirm.addEventListener("click", function(){
+    promptModal.classList.add("hidden");
+    openDetail(activeNode);
+  });
+
+  function openDetail(node){
+    appMode = "detail";
+    detailHero.style.background = node.project.cssColor;
+    detailMedium.textContent = node.project.medium;
+    detailTitle.textContent = node.project.title;
+    detailYear.textContent = node.project.year;
+    detailDesc.textContent = node.project.desc;
+    detailPanel.classList.add("open");
+  }
+  detailBack.addEventListener("click", function(){
+    detailPanel.classList.remove("open");
+    if (activeNode) cooldownId = activeNode.project.id;
+    appMode = "exploring";
+  });
+
+  // ---------------------------------------------------------------
+  // player movement (camera-relative, character auto-faces motion)
+  // ---------------------------------------------------------------
+  var WALK_SPEED = 5.6;
+
+  function updatePlayer(dt){
+    var throttle = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
+    throttle += -joyVec.y;
+    throttle = Math.max(-1, Math.min(1, throttle));
+
+    var steer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    steer += joyVec.x;
+    steer = Math.max(-1, Math.min(1, steer));
+
+    var mx = -steer, mz = throttle;
+    var mag = Math.hypot(mx, mz);
+    if (mag > 1){ mx /= mag; mz /= mag; }
+
+    playerState.x += mx * WALK_SPEED * dt;
+    playerState.z += mz * WALK_SPEED * dt;
+    playerState.x = Math.max(-ROOM_HALF_X + 0.6, Math.min(ROOM_HALF_X - 0.6, playerState.x));
+    playerState.z = Math.max(ROOM_MIN_Z + 0.6, Math.min(ROOM_MAX_Z - 0.6, playerState.z));
+
+    var moving = mag > 0.05;
+    if (moving){
+      var targetHeading = Math.atan2(mx, mz);
+      var diff = wrapAngle(targetHeading - playerState.heading);
+      playerState.heading = wrapAngle(playerState.heading + diff * Math.min(1, 12 * dt));
+    }
+    walkBlend += ((moving ? 1 : 0) - walkBlend) * Math.min(1, 8 * dt);
+    walkPhase += dt * 10 * Math.max(0.15, walkBlend);
+
+    player.position.set(playerState.x, 0, playerState.z);
+    player.rotation.y = playerState.heading;
+
+    var swing = Math.sin(walkPhase) * 0.6 * walkBlend;
+    legL.rotation.x = swing;
+    legR.rotation.x = -swing;
+    armL.rotation.x = -swing * 0.8;
+    armR.rotation.x = swing * 0.8;
+
+    checkNodeTriggers();
+  }
+
+  function checkNodeTriggers(){
+    if (appMode !== "exploring") return;
+    nodeMarkers.forEach(function(n){
+      var d = Math.hypot(playerState.x - n.project.x, playerState.z - n.project.z);
+      if (d < TRIGGER_RADIUS) {
+        if (cooldownId !== n.project.id && activeNode !== n) openPrompt(n);
+      } else if (d > TRIGGER_RADIUS + EXIT_BUFFER) {
+        if (activeNode === n) {
+          promptModal.classList.add("hidden");
+          activeNode = null;
+        }
+        if (cooldownId === n.project.id) cooldownId = null;
+      }
+    });
+  }
+
+  function updateNodes(dt){
+    nodeMarkers.forEach(function(n){
+      n.gem.rotation.y += dt * 0.6;
+      n.gem.rotation.x += dt * 0.35;
+      n.gem.position.y = n.gemBaseY + Math.sin(elapsed * 1.4 + n.phase) * 0.14;
+
+      for (var pi = 0; pi < n.particleParams.length; pi++){
+        var pp = n.particleParams[pi];
+        var ang = elapsed * pp.speed + pp.phase;
+        var py = pp.height + Math.sin(elapsed * pp.bobSpeed + pp.phase) * pp.bobAmp;
+        n.particlePositions[pi * 3] = Math.cos(ang) * pp.radius;
+        n.particlePositions[pi * 3 + 1] = py;
+        n.particlePositions[pi * 3 + 2] = Math.sin(ang) * pp.radius;
+      }
+      n.particles.geometry.attributes.position.needsUpdate = true;
+
+      var d = Math.hypot(playerState.x - n.project.x, playerState.z - n.project.z);
+      var op = d < AWARE_RADIUS
+        ? Math.max(0, Math.min(1, 1 - (d - TRIGGER_RADIUS) / (AWARE_RADIUS - TRIGGER_RADIUS)))
+        : 0;
+      n.label.style.opacity = op;
+
+      var v = new THREE.Vector3(n.project.x, n.gemBaseY + 0.6, n.project.z);
+      v.project(camera);
+      if (v.z < 1) {
+        n.label.style.left = ((v.x * 0.5 + 0.5) * window.innerWidth) + "px";
+        n.label.style.top = ((-v.y * 0.5 + 0.5) * window.innerHeight) + "px";
+      } else {
+        n.label.style.opacity = 0;
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // camera + loop
+  // ---------------------------------------------------------------
+  var camPos = new THREE.Vector3(CAM_OFFSET.x, CAM_OFFSET.y, CAM_OFFSET.z + playerState.z);
+  var clock = new THREE.Clock();
+  var elapsed = 0;
+
+  function animate(){
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    elapsed += dt;
+
+    if (appMode === "exploring") updatePlayer(dt);
+
+    var desired = new THREE.Vector3(playerState.x + CAM_OFFSET.x, CAM_OFFSET.y, playerState.z + CAM_OFFSET.z);
+    camPos.lerp(desired, 1 - Math.pow(0.001, dt));
+    camera.position.copy(camPos);
+    camera.lookAt(playerState.x, 0.6, playerState.z);
+    camera.updateMatrixWorld();
+
+    updateNodes(dt);
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener("resize", function(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  requestAnimationFrame(function(){
+    document.getElementById("loading").classList.add("hidden");
+    animate();
+  });
+
+})();
+</script>
+</body>
+</html>

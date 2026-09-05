@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Hide and Seek — Mingrui Xu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#17160f;
+    --paper:#f7f6f1;
+    --muted:#6b6858;
+    --line:rgba(23,22,15,0.12);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    overscroll-behavior:none; touch-action:none;
+    background:#F0E4D3;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--ink);
+  }
+  #app{ position:fixed; inset:0; }
+  #app canvas{ display:block; width:100%; height:100%; }
+
+  #loading{
+    position:fixed; inset:0; z-index:50;
+    background:#F0E4D3;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px;
+    transition:opacity .5s ease;
+  }
+  #loading.hidden{ opacity:0; pointer-events:none; }
+  #loading .mark{ font-family:'Fraunces',serif; font-size:22px; }
+  #loading .sub{ font-size:13px; color:rgba(23,22,15,0.55); }
+
+  #hud-top{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:20px 22px; pointer-events:none;
+  }
+  #hud-top .left-group{ display:flex; flex-direction:column; gap:8px; }
+  #back-link{
+    font-family:'Space Grotesk',sans-serif; font-size:13px;
+    background:rgba(247,246,241,0.85); backdrop-filter:blur(6px);
+    padding:8px 14px; border-radius:999px;
+    pointer-events:auto; cursor:pointer; border:none; color:var(--ink);
+    width:fit-content;
+    transition:background .15s ease;
+  }
+  #back-link:hover{ background:rgba(247,246,241,0.98); }
+  #project-tag{
+    font-family:'Fraunces',serif; font-size:16px;
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:6px 12px; border-radius:999px;
+    width:fit-content;
+  }
+  #hud-top .hint{
+    position:fixed; top:20px; right:22px;
+    font-size:12.5px; color:var(--ink);
+    background:rgba(247,246,241,0.75); backdrop-filter:blur(6px);
+    padding:7px 13px; border-radius:999px;
+    max-width:220px; text-align:right; line-height:1.5;
+    transition:opacity .6s ease;
+  }
+  #hud-top .hint.faded{ opacity:0; }
+
+  #labels-layer{ position:fixed; inset:0; z-index:5; pointer-events:none; }
+  .node-label{
+    position:absolute; transform:translate(-50%,-100%);
+    padding:5px 11px; border-radius:8px;
+    background:rgba(247,246,241,0.88);
+    border-bottom:2.5px solid var(--c, #333);
+    font-size:12.5px; font-weight:500; white-space:nowrap;
+    opacity:0; will-change:transform,opacity;
+  }
+
+  #joystick{
+    display:none;
+    position:fixed; left:26px; bottom:26px; z-index:20;
+    width:118px; height:118px; border-radius:50%;
+    background:rgba(23,22,15,0.16);
+    border:1px solid rgba(247,246,241,0.5);
+    touch-action:none;
+  }
+  @media (pointer:coarse){ #joystick{ display:block; } }
+  #joystick-knob{
+    position:absolute; left:50%; top:50%; width:52px; height:52px;
+    margin:-26px 0 0 -26px; border-radius:50%;
+    background:rgba(247,246,241,0.85);
+    box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  #reset-btn{
+    position:fixed; right:20px; bottom:26px; z-index:20;
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px;
+    background:rgba(247,246,241,0.85); color:var(--ink);
+    border:none; padding:10px 16px; border-radius:999px;
+    cursor:pointer;
+  }
+
+  #quick-nav{ position:fixed; top:76px; right:22px; z-index:25; }
+  #quick-nav-toggle{
+    display:flex; align-items:center; gap:9px;
+    background:rgba(247,246,241,0.85); border:none;
+    padding:11px 18px; border-radius:999px;
+    font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--ink);
+    cursor:pointer;
+  }
+  #quick-nav-arrow{ display:inline-block; transition:transform .2s ease; font-size:15px; }
+  #quick-nav.open #quick-nav-arrow{ transform:rotate(180deg); }
+  #quick-nav-panel{
+    margin-top:8px; background:rgba(247,246,241,0.96);
+    border-radius:14px; overflow:hidden;
+    max-height:0; opacity:0; transition:max-height .25s ease, opacity .2s ease;
+    pointer-events:none;
+  }
+  #quick-nav.open #quick-nav-panel{ max-height:420px; opacity:1; pointer-events:auto; }
+  .quick-nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .quick-nav-item:last-child{ border-bottom:none; }
+  .quick-nav-item:hover{ background:rgba(23,22,15,0.05); }
+  .quick-nav-swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+
+  #prompt-modal{
+    position:fixed; inset:0; z-index:30;
+    display:flex; align-items:flex-start; justify-content:flex-start;
+    padding:120px 20px 0 22px;
+    transition:opacity .2s ease;
+  }
+  #prompt-modal.hidden{ opacity:0; pointer-events:none; }
+  .prompt-card{
+    width:320px; max-width:calc(100vw - 42px);
+    background:var(--paper);
+    border-radius:16px;
+    padding:22px 22px 18px;
+    border-top:4px solid var(--c,#333);
+    box-shadow:0 14px 34px rgba(23,22,15,0.2);
+    transform:translate(0,0);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  #prompt-modal.hidden .prompt-card{ transform:translate(-26px,-18px); }
+  .prompt-card .kicker{ font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .prompt-card h3{ font-family:'Fraunces',serif; font-weight:400; font-size:23px; margin:0 0 14px; }
+  .prompt-actions{ display:flex; gap:10px; }
+  .prompt-actions button{
+    flex:1; padding:11px 10px; border-radius:10px; border:none;
+    font-family:'Space Grotesk',sans-serif; font-weight:500;
+    cursor:pointer; text-align:center; line-height:1.3;
+  }
+  .prompt-actions .btn-cn{ display:block; font-size:10.5px; font-weight:400; opacity:0.72; margin-top:1px; }
+  .prompt-actions .btn-en{ display:block; font-size:14px; }
+  .btn-primary{ background:var(--c,#28428a); color:#fff; }
+  .btn-ghost{ background:transparent; color:var(--ink); border:1px solid var(--line) !important; }
+
+  #detail-panel{
+    position:fixed; inset:0; z-index:40;
+    background:var(--paper);
+    transform:translateX(100%);
+    transition:transform .38s cubic-bezier(.2,.8,.2,1);
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  #detail-panel.open{ transform:translateX(0); }
+  .detail-hero{ height:34vh; min-height:200px; background:var(--c,#333); display:flex; align-items:flex-end; padding:24px; }
+  .detail-hero span{ font-size:12.5px; color:rgba(255,255,255,0.85); background:rgba(0,0,0,0.18); padding:5px 11px; border-radius:999px; }
+  .detail-body{ padding:28px 26px 60px; max-width:560px; }
+  .detail-body h2{ font-family:'Fraunces',serif; font-weight:400; font-size:34px; margin:0 0 6px; }
+  .detail-body .year{ font-size:13px; color:var(--muted); margin-bottom:22px; }
+  .detail-body p{ font-size:16px; line-height:1.7; margin:0 0 16px; }
+  .back-btn{
+    position:fixed; top:18px; left:18px; z-index:41;
+    background:rgba(247,246,241,0.92); border:none; padding:10px 16px;
+    border-radius:999px; font-family:'Space Grotesk',sans-serif; font-size:13px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="mark">Hide and Seek</div>
+  <div class="sub">正在布置猫屋…</div>
+</div>
+
+<div id="app"></div>
+<div id="labels-layer"></div>
+
+<header id="hud-top">
+  <div class="left-group">
+    <button id="back-link">← Map</button>
+    <div id="project-tag">Hide and Seek</div>
+  </div>
+  <div class="hint" id="hint">WASD / 方向键行走<br>靠近家具上的光点查看介绍</div>
+</header>
+
+<div id="joystick"><div id="joystick-knob"></div></div>
+<button id="reset-btn">回到门口</button>
+
+<div id="quick-nav">
+  <button id="quick-nav-toggle"><span>Corners</span><span id="quick-nav-arrow">⌄</span></button>
+  <div id="quick-nav-panel"></div>
+</div>
+
+<div id="prompt-modal" class="hidden">
+  <div class="prompt-card" id="prompt-card">
+    <div class="kicker" id="prompt-medium">Medium</div>
+    <h3 id="prompt-title">Section</h3>
+    <div class="prompt-actions">
+      <button class="btn-ghost" id="prompt-cancel">
+        <span class="btn-cn">继续探索</span>
+        <span class="btn-en">Keep exploring</span>
+      </button>
+      <button class="btn-primary" id="prompt-confirm">
+        <span class="btn-cn">进去看看？</span>
+        <span class="btn-en">Take a look?</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="detail-panel">
+  <button class="back-btn" id="detail-back">← 返回猫屋</button>
+  <div class="detail-hero" id="detail-hero"><span id="detail-medium">Medium</span></div>
+  <div class="detail-body">
+    <h2 id="detail-title">Section</h2>
+    <div class="year" id="detail-year">2024</div>
+    <p id="detail-desc"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Section data — 5 nodes, each on a piece of furniture in a
+  // different cat-house zone
+  // ---------------------------------------------------------------
+  var SECTIONS = [
+    { id:"hideout",  title:"The Hideout",     medium:"Case study",  year:"2024", color:0x1FB6A6,
+      desc:"《Hide and Seek》的项目概览：一个多人捉迷藏玩法的互动小项目，重点在关卡的视线遮挡设计和躲藏时的节奏感。",
+      x:0,  z:-11, gemY:1.2 },
+    { id:"seekers",  title:"The Seekers",     medium:"Research",    year:"2024", color:0x2E8B7C,
+      desc:"最早的原型只有一个猫塔，靠观察小范围测试玩家怎么找猫，才慢慢摸清楚什么样的视线遮挡最有意思。",
+      x:-9, z:-4,  gemY:1.6 },
+    { id:"spots",    title:"The Hiding Spots", medium:"Level design", year:"2024", color:0x4FC9B8,
+      desc:"每一个藏身点的高度、遮挡角度都反复调过，太好找没意思，太难找又容易让人放弃，找那个刚刚好的平衡点。",
+      x:9,  z:-4,  gemY:1.3 },
+    { id:"reveal",   title:"The Reveal",      medium:"Game design", year:"2024", color:0xE0A458,
+      desc:"找到猫之后的反馈很重要——一声软软的喵叫、一个小小的抖动，比任何得分提示都更让人开心。",
+      x:-9, z:8,   gemY:1.3 },
+    { id:"purr",     title:"Purrformance",    medium:"Outcome",     year:"2024", color:0xD9714A,
+      desc:"上线后最常见的反馈是「猫不够多」——目前正在考虑要不要加入更多猫咪和新的房间。",
+      x:9,  z:8,   gemY:1.3 }
+  ];
+  SECTIONS.forEach(function(s){ s.cssColor = "#" + s.color.toString(16).padStart(6, "0"); });
+
+  var TRIGGER_RADIUS = 2.8, AWARE_RADIUS = 7.0, EXIT_BUFFER = 1.3;
+  var ROOM_HALF_X = 11, ROOM_MIN_Z = -16, ROOM_MAX_Z = 16;
+
+  function wrapAngle(a){
+    return a - Math.PI * 2 * Math.floor((a + Math.PI) / (Math.PI * 2));
+  }
+
+  // ---------------------------------------------------------------
+  // three.js setup
+  // ---------------------------------------------------------------
+  var container = document.getElementById("app");
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xF0E4D3);
+  scene.fog = new THREE.Fog(0xF0E4D3, 26, 54);
+
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 300);
+  var CAM_OFFSET = new THREE.Vector3(0, 16, -12.4);
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xFCEFDD, 0.8));
+  var sun = new THREE.DirectionalLight(0xFFF3DA, 0.6);
+  sun.position.set(12, 22, 8);
+  scene.add(sun);
+
+  // ---------- floor ----------
+  var floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(28, 32),
+    new THREE.MeshStandardMaterial({ color:0xDCC49F, flatShading:true })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  function rug(x, z, r, color){
+    var m = new THREE.Mesh(new THREE.CircleGeometry(r, 16), new THREE.MeshStandardMaterial({ color:color, flatShading:true }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.012, z);
+    scene.add(m);
+  }
+  rug(0, -11, 2.4, 0xEADFC8);
+  rug(-9, -4, 2.6, 0xC9E4DE);
+  rug(9, -4, 2.6, 0xE8D8C0);
+  rug(-9, 8, 2.6, 0xE0C9D0);
+  rug(9, 8, 2.6, 0xEAD9B8);
+
+  var doormat = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.6, 1.0),
+    new THREE.MeshStandardMaterial({ color:0x7A5233, flatShading:true })
+  );
+  doormat.rotation.x = -Math.PI / 2;
+  doormat.position.set(0, 0.02, -15.3);
+  scene.add(doormat);
+
+  // ---------- walls (single open room, exterior only) ----------
+  var wallMat = new THREE.MeshStandardMaterial({ color:0xF7EEDD, flatShading:true });
+  var windowMat = new THREE.MeshBasicMaterial({ color:0xBFD9E8, transparent:true, opacity:0.5 });
+
+  function wall(w, h, d, x, y, z){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    m.position.set(x, y, z);
+    scene.add(m);
+  }
+  wall(0.4, 2.2, 32, -ROOM_HALF_X, 1.1, 0);
+  wall(0.4, 2.2, 32, ROOM_HALF_X, 1.1, 0);
+  wall(22.4, 2.2, 0.4, 0, 1.1, ROOM_MAX_Z);
+  wall(8, 2.2, 0.4, -7, 1.1, ROOM_MIN_Z);
+  wall(8, 2.2, 0.4, 7, 1.1, ROOM_MIN_Z);
+
+  [-8.5, 8.5].forEach(function(x){
+    var win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.0, 3.0), windowMat);
+    win.position.set(x, 1.5, ROOM_MAX_Z - 0.05);
+    scene.add(win);
+  });
+
+  // ---------------------------------------------------------------
+  // cat-house furniture
+  // ---------------------------------------------------------------
+  var woodLight = new THREE.MeshStandardMaterial({ color:0xC9A876, flatShading:true });
+  var woodDark  = new THREE.MeshStandardMaterial({ color:0x6B4A32, flatShading:true });
+  var beige = new THREE.MeshStandardMaterial({ color:0xE8DCC8, flatShading:true });
+  var cushionMat = new THREE.MeshStandardMaterial({ color:0xD98E4A, flatShading:true });
+
+  function box(w,h,d,mat,x,y,z){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.position.set(x,y,z);
+    scene.add(m);
+    return m;
+  }
+  function cylinder(r1,r2,h,mat,x,y,z){
+    var m = new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,8), mat);
+    m.position.set(x,y,z);
+    scene.add(m);
+    return m;
+  }
+
+  // reception desk (hosts "The Hideout")
+  box(1.6, 0.75, 0.6, woodLight, 0, 0.38, -12);
+  box(0.06, 0.3, 0.62, beige, 0, 0.9, -12);
+
+  // cat tree forest (hosts "The Seekers")
+  function catTree(x, z, h){
+    cylinder(0.12, 0.14, h, woodDark, x, h/2, z);
+    [0.4, 0.75].forEach(function(f, i){
+      var plat = cylinder(0.35, 0.35, 0.05, beige, x + (i%2?0.05:-0.05), h*f, z);
+    });
+    var top = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.35,8), cushionMat);
+    top.position.set(x, h + 0.17, z);
+    scene.add(top);
+  }
+  catTree(-9.5, -5, 2.1);
+  catTree(-8.2, -3.2, 1.5);
+  catTree(-10.3, -3, 1.1);
+  box(0.6, 0.6, 0.6, woodLight, -9, 0.3, -4);            // side table (hosts "The Seekers")
+
+  // play zone (hosts "The Hiding Spots")
+  var tunnelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 10, 1, true);
+  var tunnel = new THREE.Mesh(tunnelGeo, beige);
+  tunnel.position.set(9.3, 0.25, -5.2);
+  scene.add(tunnel);
+  box(0.7, 0.35, 0.5, cushionMat, 8.5, 0.18, -3);         // low toy box (hosts "The Hiding Spots")
+  [[9.8,-3.5],[8.8,-2.2],[10,-2.6]].forEach(function(p){
+    var ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12,0), new THREE.MeshStandardMaterial({ color:0xE0A458, flatShading:true }));
+    ball.position.set(p[0], 0.12, p[1]);
+    scene.add(ball);
+  });
+
+  // nap corner (hosts "The Reveal")
+  box(1.2, 0.35, 1.0, cushionMat, -9, 0.18, 8);
+  box(1.3, 0.1, 1.1, beige, -9, 0.4, 8);
+  box(0.6, 0.5, 0.6, woodLight, -7.5, 0.25, 9.6);         // small side table (hosts "The Reveal")
+
+  // window nook (hosts "Purrformance")
+  box(1.6, 0.4, 0.6, woodLight, 9, 0.2, 10.8);
+  box(1.6, 0.18, 0.6, beige, 9, 0.46, 10.8);               // window seat cushion (hosts "Purrformance")
+
+  // ---------------------------------------------------------------
+  // potted plants + wall-mounted cat shelves — fill out the room
+  // ---------------------------------------------------------------
+  var potMat = new THREE.MeshStandardMaterial({ color:0xB56B45, flatShading:true });
+  var foliageColors = [0x4F7D4F, 0x5E9B5E, 0x3F6B45];
+  function potPlant(x, z, scale){
+    scale = scale || 1;
+    cylinder(0.16*scale, 0.13*scale, 0.22*scale, potMat, x, 0.11*scale, z);
+    var foliageMat = new THREE.MeshStandardMaterial({ color:foliageColors[Math.floor(Math.random()*foliageColors.length)], flatShading:true });
+    var foliage = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26*scale, 0), foliageMat);
+    foliage.position.set(x, 0.22*scale + 0.22*scale, z);
+    scene.add(foliage);
+  }
+  [[-9.8,-9],[9.8,-9],[-9.8,4],[9.8,4],[-9.8,13],[9.8,13],[0,-8.5,0.8]].forEach(function(p){
+    potPlant(p[0], p[1], p[2]);
+  });
+
+  function catShelf(x, y, z){
+    box(0.9, 0.06, 0.35, woodLight, x, y, z);
+    box(0.9, 0.1, 0.04, woodDark, x, y-0.06, z + (x<0?0.16:-0.16));
+  }
+  catShelf(-10.5, 0.9, -1);
+  catShelf(-10.5, 1.5, 3);
+  catShelf(-10.5, 2.1, 7);
+  catShelf(10.5, 0.9, -1);
+  catShelf(10.5, 1.5, 3);
+  catShelf(10.5, 2.1, 7);
+
+  // ---------------------------------------------------------------
+  // cats — lots of low-poly cats scattered around the house
+  // ---------------------------------------------------------------
+  var catColors = [0xD98E4A, 0x9B9B9B, 0x2B2B2B, 0xF2EDE1, 0x8B6B4A, 0xE0C9A6];
+  function makeCat(x, z, sleeping, y){
+    var color = catColors[Math.floor(Math.random() * catColors.length)];
+    var mat = new THREE.MeshStandardMaterial({ color:color, flatShading:true });
+    var group = new THREE.Group();
+
+    if (!sleeping){
+      var body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), mat);
+      body.scale.set(1.3, 0.85, 1.05);
+      body.position.set(0, 0.14, 0);
+      group.add(body);
+      var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), mat);
+      head.position.set(0, 0.20, 0.17);
+      group.add(head);
+      [-1, 1].forEach(function(side){
+        var ear = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.08, 4), mat);
+        ear.position.set(side * 0.06, 0.28, 0.17);
+        ear.rotation.z = -side * 0.25;
+        group.add(ear);
+      });
+      var eyeMat = new THREE.MeshBasicMaterial({ color:0x1c1c1c });
+      [-1, 1].forEach(function(side){
+        var eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), eyeMat);
+        eye.position.set(side * 0.045, 0.205, 0.25);
+        group.add(eye);
+      });
+      var tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, 0.28, 5), mat);
+      tail.position.set(0, 0.22, -0.19);
+      tail.rotation.x = -0.9;
+      group.add(tail);
+    } else {
+      var bodyS = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), mat);
+      bodyS.scale.set(1.5, 0.55, 1.2);
+      bodyS.position.set(0, 0.09, 0);
+      group.add(bodyS);
+      var headS = new THREE.Mesh(new THREE.IcosahedronGeometry(0.10, 0), mat);
+      headS.position.set(0.15, 0.11, 0.04);
+      group.add(headS);
+      [-1, 1].forEach(function(side){
+        var ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.06, 4), mat);
+        ear.position.set(0.15 + side * 0.03, 0.17, 0.05);
+        group.add(ear);
+      });
+    }
+
+    group.position.set(x, y || 0, z);
+    group.rotation.y = Math.random() * Math.PI * 2;
+    scene.add(group);
+    return group;
+  }
+
+  [
+    [1.5,-13.2],[-1.6,-12.6],[2.4,-10.8],[-2.6,-9.4],
+    [-9.6,-5.6],[-7.8,-4.6],[-10.4,-2.4],[-8.6,-2.8],
+    [9.6,-5.6],[8.2,-3.6],[10.4,-3],
+    [-9.4,8.8,1],[-8.2,7.4,1],[-7.6,9.6,1],
+    [9.4,10.4],[8.2,9.4],[10.2,11.4],
+    [0,2],[-3,6],[3,-1],[0.5,9],[-5,0.5],[5,1],
+    [-10.1,-1,0,0.98],[-10.1,7,0,2.18],
+    [10.1,3,0,1.58]
+  ].forEach(function(c){ makeCat(c[0], c[1], !!c[2], c[3]); });
+
+  // ---------------------------------------------------------------
+  // glow texture + node markers (on furniture)
+  // ---------------------------------------------------------------
+  function makeGlowTexture(){
+    var size = 64;
+    var canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    var g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.7)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }
+  var glowTexture = makeGlowTexture();
+  var PARTICLE_COUNT = 12;
+
+  var nodeMarkers = [];
+  SECTIONS.forEach(function(s){
+    var group = new THREE.Group();
+    group.position.set(s.x, 0, s.z);
+
+    var pad = new THREE.Mesh(
+      new THREE.CircleGeometry(1.1, 10),
+      new THREE.MeshBasicMaterial({ color:s.color, transparent:true, opacity:0.3 })
+    );
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.y = 0.02;
+
+    var gem = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.32, 0),
+      new THREE.MeshStandardMaterial({ color:s.color, flatShading:true, roughness:0.4 })
+    );
+    gem.position.y = s.gemY;
+
+    var particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    var particleParams = [];
+    for (var pi = 0; pi < PARTICLE_COUNT; pi++){
+      particleParams.push({
+        radius: 0.3 + Math.random() * 0.4,
+        height: s.gemY - 0.3 + Math.random() * 1.1,
+        speed: 0.35 + Math.random() * 0.7,
+        phase: Math.random() * Math.PI * 2,
+        bobSpeed: 0.6 + Math.random() * 0.9,
+        bobAmp: 0.1 + Math.random() * 0.16
+      });
+    }
+    var particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    var particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+      size:0.24, map:glowTexture, color:s.color, transparent:true, opacity:0.9,
+      blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+    }));
+
+    group.add(pad, gem, particles);
+    scene.add(group);
+
+    var label = document.createElement("div");
+    label.className = "node-label";
+    label.style.setProperty("--c", s.cssColor);
+    label.textContent = s.title;
+    document.getElementById("labels-layer").appendChild(label);
+
+    nodeMarkers.push({
+      project:s, gem:gem, label:label, phase:Math.random()*10,
+      particles:particles, particlePositions:particlePositions, particleParams:particleParams,
+      gemBaseY:s.gemY
+    });
+  });
+
+  var qnRoot = document.getElementById("quick-nav");
+  var qnToggle = document.getElementById("quick-nav-toggle");
+  var qnPanel = document.getElementById("quick-nav-panel");
+  SECTIONS.forEach(function(s, i){
+    var item = document.createElement("div");
+    item.className = "quick-nav-item";
+    item.innerHTML = '<span class="quick-nav-swatch" style="background:' + s.cssColor + '"></span><span>' + s.title + "</span>";
+    item.addEventListener("click", function(){
+      qnRoot.classList.remove("open");
+      openDetail(nodeMarkers[i]);
+    });
+    qnPanel.appendChild(item);
+  });
+  qnToggle.addEventListener("click", function(){ qnRoot.classList.toggle("open"); dismissHint(); });
+
+  document.getElementById("back-link").addEventListener("click", function(){
+    window.location.href = "index.html";
+  });
+
+  // ---------------------------------------------------------------
+  // player: low-poly young girl — sweater + skirt, ponytail
+  // ---------------------------------------------------------------
+  var sweaterMat = new THREE.MeshStandardMaterial({ color:0xF2E4D8, flatShading:true });
+  var skirtMat = new THREE.MeshStandardMaterial({ color:0x6FAFA0, flatShading:true });
+  var hairMat = new THREE.MeshStandardMaterial({ color:0x5A3D2B, flatShading:true });
+  var shoeMat = new THREE.MeshStandardMaterial({ color:0xF5F3EE, flatShading:true });
+  var skinMat = new THREE.MeshStandardMaterial({ color:0xE8B892, flatShading:true });
+
+  var player = new THREE.Group();
+
+  var pLegGeo = new THREE.BoxGeometry(0.10, 0.60, 0.10);
+  pLegGeo.translate(0, -0.30, 0);
+  var pShoeGeo = new THREE.BoxGeometry(0.13, 0.08, 0.19);
+  pShoeGeo.translate(0, -0.60, 0.02);
+
+  var legL = new THREE.Group();
+  legL.position.set(-0.12, 0.62, 0);
+  legL.add(new THREE.Mesh(pLegGeo, skinMat));
+  legL.add(new THREE.Mesh(pShoeGeo, shoeMat));
+  player.add(legL);
+
+  var legR = new THREE.Group();
+  legR.position.set(0.12, 0.62, 0);
+  legR.add(new THREE.Mesh(pLegGeo, skinMat));
+  legR.add(new THREE.Mesh(pShoeGeo, shoeMat));
+  player.add(legR);
+
+  var skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 0.26, 8), skirtMat);
+  skirt.position.set(0, 0.57, 0);
+  player.add(skirt);
+
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.4, 0.24), sweaterMat);
+  torso.position.set(0, 0.82, 0);
+  player.add(torso);
+
+  var pArmGeo = new THREE.BoxGeometry(0.10, 0.32, 0.10);
+  pArmGeo.translate(0, -0.16, 0);
+  var armL = new THREE.Group();
+  armL.position.set(-0.24, 1.00, 0);
+  armL.add(new THREE.Mesh(pArmGeo, sweaterMat));
+  player.add(armL);
+  var armR = new THREE.Group();
+  armR.position.set(0.24, 1.00, 0);
+  armR.add(new THREE.Mesh(pArmGeo, sweaterMat));
+  player.add(armR);
+
+  var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), skinMat);
+  head.position.set(0, 1.24, 0);
+  player.add(head);
+
+  var hair = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), hairMat);
+  hair.scale.set(1, 0.55, 1);
+  hair.position.set(0, 1.33, -0.01);
+  player.add(hair);
+
+  var ponytail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, 0.32, 6), hairMat);
+  ponytail.position.set(0, 1.14, -0.19);
+  ponytail.rotation.x = 0.55;
+  player.add(ponytail);
+
+  var shadowBlob = new THREE.Mesh(
+    new THREE.CircleGeometry(0.36, 10),
+    new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.22 })
+  );
+  shadowBlob.rotation.x = -Math.PI / 2;
+  shadowBlob.position.y = 0.02;
+  player.add(shadowBlob);
+
+  scene.add(player);
+
+  // ---------------------------------------------------------------
+  // input
+  // ---------------------------------------------------------------
+  var keys = { fwd:false, back:false, left:false, right:false };
+  window.addEventListener("keydown", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = true; break;
+      case "s": case "S": case "ArrowDown": keys.back = true; break;
+      case "a": case "A": case "ArrowLeft": keys.left = true; break;
+      case "d": case "D": case "ArrowRight": keys.right = true; break;
+    }
+    dismissHint();
+  });
+  window.addEventListener("keyup", function(e){
+    switch(e.key){
+      case "w": case "W": case "ArrowUp": keys.fwd = false; break;
+      case "s": case "S": case "ArrowDown": keys.back = false; break;
+      case "a": case "A": case "ArrowLeft": keys.left = false; break;
+      case "d": case "D": case "ArrowRight": keys.right = false; break;
+    }
+  });
+
+  var joystick = document.getElementById("joystick");
+  var knob = document.getElementById("joystick-knob");
+  var joyVec = { x:0, y:0 };
+  var joyActive = false, joyId = null, joyBaseRect = null;
+
+  joystick.addEventListener("pointerdown", function(e){
+    joyActive = true; joyId = e.pointerId;
+    joyBaseRect = joystick.getBoundingClientRect();
+    joystick.setPointerCapture(e.pointerId);
+    updateJoy(e);
+    dismissHint();
+  });
+  joystick.addEventListener("pointermove", function(e){
+    if (joyActive && e.pointerId === joyId) updateJoy(e);
+  });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(evt){
+    joystick.addEventListener(evt, function(e){
+      if (e.pointerId !== joyId) return;
+      joyActive = false; joyVec.x = 0; joyVec.y = 0;
+      knob.style.transform = "translate(0px,0px)";
+    });
+  });
+  function updateJoy(e){
+    var cx = joyBaseRect.left + joyBaseRect.width/2;
+    var cy = joyBaseRect.top + joyBaseRect.height/2;
+    var dx = e.clientX - cx, dy = e.clientY - cy;
+    var max = joyBaseRect.width/2;
+    var dist = Math.min(Math.hypot(dx,dy), max);
+    var ang = Math.atan2(dy,dx);
+    var kx = Math.cos(ang)*dist, ky = Math.sin(ang)*dist;
+    knob.style.transform = "translate(" + kx + "px," + ky + "px)";
+    joyVec.x = kx/max;
+    joyVec.y = ky/max;
+  }
+
+  function dismissHint(){
+    var hint = document.getElementById("hint");
+    if (hint) hint.classList.add("faded");
+  }
+  setTimeout(dismissHint, 5000);
+
+  var playerState = { x:0, z:-14, heading:0 };
+  var walkPhase = 0, walkBlend = 0;
+
+  document.getElementById("reset-btn").addEventListener("click", function(){
+    playerState.x = 0; playerState.z = -14; playerState.heading = 0;
+  });
+
+  // ---------------------------------------------------------------
+  // state machine: exploring / detail
+  // ---------------------------------------------------------------
+  var appMode = "exploring";
+  var cooldownId = null;
+  var activeNode = null;
+
+  var promptModal = document.getElementById("prompt-modal");
+  var promptCard = document.getElementById("prompt-card");
+  var promptTitle = document.getElementById("prompt-title");
+  var promptMedium = document.getElementById("prompt-medium");
+  var promptConfirm = document.getElementById("prompt-confirm");
+  var promptCancel = document.getElementById("prompt-cancel");
+
+  var detailPanel = document.getElementById("detail-panel");
+  var detailHero = document.getElementById("detail-hero");
+  var detailTitle = document.getElementById("detail-title");
+  var detailMedium = document.getElementById("detail-medium");
+  var detailYear = document.getElementById("detail-year");
+  var detailDesc = document.getElementById("detail-desc");
+  var detailBack = document.getElementById("detail-back");
+
+  function openPrompt(node){
+    activeNode = node;
+    promptCard.style.setProperty("--c", node.project.cssColor);
+    promptTitle.textContent = node.project.title;
+    promptMedium.textContent = node.project.medium;
+    promptModal.classList.remove("hidden");
+  }
+  function closePrompt(withCooldown){
+    promptModal.classList.add("hidden");
+    if (withCooldown && activeNode) cooldownId = activeNode.project.id;
+  }
+  promptCancel.addEventListener("click", function(){ closePrompt(true); });
+  promptConfirm.addEventListener("click", function(){
+    promptModal.classList.add("hidden");
+    openDetail(activeNode);
+  });
+
+  function openDetail(node){
+    appMode = "detail";
+    detailHero.style.background = node.project.cssColor;
+    detailMedium.textContent = node.project.medium;
+    detailTitle.textContent = node.project.title;
+    detailYear.textContent = node.project.year;
+    detailDesc.textContent = node.project.desc;
+    detailPanel.classList.add("open");
+  }
+  detailBack.addEventListener("click", function(){
+    detailPanel.classList.remove("open");
+    if (activeNode) cooldownId = activeNode.project.id;
+    appMode = "exploring";
+  });
+
+  // ---------------------------------------------------------------
+  // player movement (camera-relative, character auto-faces motion)
+  // ---------------------------------------------------------------
+  var WALK_SPEED = 6.0;
+
+  function updatePlayer(dt){
+    var throttle = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
+    throttle += -joyVec.y;
+    throttle = Math.max(-1, Math.min(1, throttle));
+
+    var steer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    steer += joyVec.x;
+    steer = Math.max(-1, Math.min(1, steer));
+
+    var mx = -steer, mz = throttle;
+    var mag = Math.hypot(mx, mz);
+    if (mag > 1){ mx /= mag; mz /= mag; }
+
+    playerState.x += mx * WALK_SPEED * dt;
+    playerState.z += mz * WALK_SPEED * dt;
+    playerState.x = Math.max(-ROOM_HALF_X + 0.6, Math.min(ROOM_HALF_X - 0.6, playerState.x));
+    playerState.z = Math.max(ROOM_MIN_Z + 0.6, Math.min(ROOM_MAX_Z - 0.6, playerState.z));
+
+    var moving = mag > 0.05;
+    if (moving){
+      var targetHeading = Math.atan2(mx, mz);
+      var diff = wrapAngle(targetHeading - playerState.heading);
+      playerState.heading = wrapAngle(playerState.heading + diff * Math.min(1, 12 * dt));
+    }
+    walkBlend += ((moving ? 1 : 0) - walkBlend) * Math.min(1, 8 * dt);
+    walkPhase += dt * 8.5 * Math.max(0.15, walkBlend);
+
+    player.position.set(playerState.x, 0, playerState.z);
+    player.rotation.y = playerState.heading;
+
+    var swing = Math.sin(walkPhase) * 0.5 * walkBlend;
+    legL.rotation.x = swing;
+    legR.rotation.x = -swing;
+    armL.rotation.x = -swing * 0.7;
+    armR.rotation.x = swing * 0.7;
+
+    checkNodeTriggers();
+  }
+
+  function checkNodeTriggers(){
+    if (appMode !== "exploring") return;
+    nodeMarkers.forEach(function(n){
+      var d = Math.hypot(playerState.x - n.project.x, playerState.z - n.project.z);
+      if (d < TRIGGER_RADIUS) {
+        if (cooldownId !== n.project.id && activeNode !== n) openPrompt(n);
+      } else if (d > TRIGGER_RADIUS + EXIT_BUFFER) {
+        if (activeNode === n) {
+          promptModal.classList.add("hidden");
+          activeNode = null;
+        }
+        if (cooldownId === n.project.id) cooldownId = null;
+      }
+    });
+  }
+
+  function updateNodes(dt){
+    nodeMarkers.forEach(function(n){
+      n.gem.rotation.y += dt * 0.6;
+      n.gem.rotation.x += dt * 0.35;
+      n.gem.position.y = n.gemBaseY + Math.sin(elapsed * 1.4 + n.phase) * 0.14;
+
+      for (var pi = 0; pi < n.particleParams.length; pi++){
+        var pp = n.particleParams[pi];
+        var ang = elapsed * pp.speed + pp.phase;
+        var py = pp.height + Math.sin(elapsed * pp.bobSpeed + pp.phase) * pp.bobAmp;
+        n.particlePositions[pi * 3] = Math.cos(ang) * pp.radius;
+        n.particlePositions[pi * 3 + 1] = py;
+        n.particlePositions[pi * 3 + 2] = Math.sin(ang) * pp.radius;
+      }
+      n.particles.geometry.attributes.position.needsUpdate = true;
+
+      var d = Math.hypot(playerState.x - n.project.x, playerState.z - n.project.z);
+      var op = d < AWARE_RADIUS
+        ? Math.max(0, Math.min(1, 1 - (d - TRIGGER_RADIUS) / (AWARE_RADIUS - TRIGGER_RADIUS)))
+        : 0;
+      n.label.style.opacity = op;
+
+      var v = new THREE.Vector3(n.project.x, n.gemBaseY + 0.6, n.project.z);
+      v.project(camera);
+      if (v.z < 1) {
+        n.label.style.left = ((v.x * 0.5 + 0.5) * window.innerWidth) + "px";
+        n.label.style.top = ((-v.y * 0.5 + 0.5) * window.innerHeight) + "px";
+      } else {
+        n.label.style.opacity = 0;
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // camera + loop
+  // ---------------------------------------------------------------
+  var camPos = new THREE.Vector3(CAM_OFFSET.x, CAM_OFFSET.y, CAM_OFFSET.z + playerState.z);
+  var clock = new THREE.Clock();
+  var elapsed = 0;
+
+  function animate(){
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    elapsed += dt;
+
+    if (appMode === "exploring") updatePlayer(dt);
+
+    var desired = new THREE.Vector3(playerState.x + CAM_OFFSET.x, CAM_OFFSET.y, playerState.z + CAM_OFFSET.z);
+    camPos.lerp(desired, 1 - Math.pow(0.001, dt));
+    camera.position.copy(camPos);
+    camera.lookAt(playerState.x, 0.75, playerState.z);
+    camera.updateMatrixWorld();
+
+    updateNodes(dt);
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener("resize", function(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  requestAnimationFrame(function(){
+    document.getElementById("loading").classList.add("hidden");
+    animate();
+  });
+
+})();
+</script>
+</body>
+</html>
