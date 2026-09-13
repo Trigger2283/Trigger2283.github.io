@@ -1,0 +1,90 @@
+I’m using OpenAI, and the model I selected is GPT-5.6 Sol.
+
+I had clear ideas and requirements for the perspective and style, they were included in the initial construction plan from the beginning. After the construction was completed, I ran the game for the first time, but found that the game could not run, so I made one change. After that, the work mainly focused on debugging the basic game and optimizing the level to make the game more reasonable and smooth.
+
+At the same time, I began to introduce items and debug them while debugging the basic functions of the game. Finally, I designed different animals to introduce different skills, and worked with AI to make adjustments, such as the objects they could be applied to and various limitations. All of these were intended to make the game somewhat different while still remaining fun and novel.
+
+[1]
+嗯，现在我们来新建一个新的项目吧，我现在要做一个游戏，crossy road, 我想做成lowpoly的3D游戏，视角为斜上方的类型，能帮我制作一个吗，同时，需要什么别的信息请告诉我
+（Well, now let's create a new project. I want to make a game, Crossy Road. I want to make it a low-poly 3D game with a diagonally elevated camera angle. Can you help me make one? Also, please tell me what other information you need.）
+
+Due to computer issues, I was not able to do any work during class.
+
+
+[2]
+补充信息，请使用Javascript
+（Additional information: please use JavaScript.）
+
+[3]
+点击开始游戏没有反应
+（Nothing happens when I click Start Game.）
+
+[4]
+现在角色前进的时候面朝的方向不对，它应该背对镜头
+（Right now, the character faces the wrong direction when moving forward. It should face away from the camera.）
+
+[5]
+好，我现在想让地形更加复杂一点，比如加入铁道和水路，同时尽可能避免一大片公路的事情出现
+（Okay, now I want to make the terrain more complex, for example by adding railways and waterways, while avoiding large stretches of road as much as possible.）
+
+[6]
+然后来试试在里面加入道具吧，比如吃到后玩家可以飞跃五行地图，并在安全处落脚，以及护盾道具
+（Next, let's try adding power-ups, such as one that lets the player fly over five rows of the map and land in a safe place after collecting it, as well as a shield power-up.）
+
+[7]
+道具数量太多了，请少一点，并且变成在玩家视野内一段时间消失，同时让木板的生成更加分散
+（There are too many power-ups. Please reduce their number and make them disappear after being within the player's view for a period of time. Also, make the logs spawn more spread out.）
+
+[8]
+为道具增加消失进度条，让玩家更加明晰
+（Add a disappearance progress bar to the power-ups so that it is clearer to the player.）
+
+[9]
+现在的进度条没有在减少，只是一个条而已
+（The current progress bar is not decreasing; it is just a bar.）
+
+[10]
+然后来设计不同的角色形象吧，每个动物都有自己的特殊技能，我们先从鸡开始，鸡可以通过挥动翅膀跳过一行地形，并落在下一行，玩家可以按Q来使用技能，技能信息在左下角，它的图标是一个翅膀，同时标注剩余可使用次数：只能使用三次。
+（Next, let's design different character appearances. Each animal has its own special skill. Let's start with the chicken. The chicken can flap its wings to jump over one row of terrain and land on the following row. The player can press Q to use the skill. The skill information should be in the bottom-left corner, with a wing as its icon, and it should also show the number of remaining uses: it can only be used three times.）
+
+[11]
+视角拉远了之后最末尾的地形会随着玩家的跳跃消失，很不自然，可以更改一下吗
+（After the camera pulls farther away, the terrain at the very end disappears as the player jumps, which looks very unnatural. Can you change that?）
+
+[12]
+接下来，请设计一个企鹅角色，企鹅可以通过滑水滑过连续的水地形（比如一行水就滑过一行，两行水就滑过两行，并在水面上失足时自动触发这个技能
+（Next, please design a penguin character. The penguin can slide across consecutive water terrain by water-sliding (for example, it slides across one row when there is one row of water and across two rows when there are two rows of water), and this skill is triggered automatically when it loses its footing on the water.）
+
+[13]
+接下来，请设计一个企鹅角色，企鹅可以通过滑水滑过连续的水地形（比如一行水就滑过一行，两行水就滑过两行），并且能在水面上失足时自动触发这个技能，这个技能依然只能使用三次
+（Next, please design a penguin character. The penguin can slide across consecutive water terrain by water-sliding (for example, it slides across one row when there is one row of water and across two rows when there are two rows of water), and this skill can be triggered automatically when it loses its footing on the water. This skill can still only be used three times.）
+
+[14]
+接下来请设计一个牛角色，牛可以按Q发动技能（和鸡一样）效果是撞飞前面一行的障碍物（汽车，火车等），并同时抵达该行，这个技能只能使用三次，注意它不可以撞飞木板
+（Next, please design a cow character. The cow can press Q to activate its skill (like the chicken). The effect is to knock away obstacles in the row ahead (cars, trains, etc.) while moving into that row. This skill can only be used three times. Note that it cannot knock away logs.）
+
+[15]
+为游戏设计英文界面，并且玩家可以在主界面选择语言，默认英文
+（Design an English interface for the game, and allow the player to select the language on the main screen, with English as the default.）
+
+[16]
+请根据这个需求帮我生成prompt_log.txt，但是内容只记录我给你发过的指令，生成中英双语版！不要进行任何更改，我之前说了什么就记录什么
+（Please generate prompt_log.txt for me according to this requirement, but its contents should only record the instructions I sent you. Create a bilingual Chinese-English version! Do not make any changes; record exactly what I previously said.）
+
+[17]
+新增一个道具，玩家捡拾到了之后可以充能一次技能，这个道具的刷新比其他两个要略低一些，其余的性质不变
+（Add a new power-up that recharges one skill use when the player picks it up. This power-up should spawn slightly less frequently than the other two, while keeping all other properties unchanged.）
+
+[18]
+将所有道具的刷新频率从固定xx行刷出一次变为达到xx行后有一定概率刷出。若该行没有刷出，则增加刷出概率，并在每三行增加一定的概率，直到刷出后重置
+（Change the spawn frequency of all power-ups from spawning once every fixed XX rows to having a certain probability of spawning after reaching XX rows. If a power-up does not spawn on that row, increase its spawn probability, and increase the probability by a certain amount every three rows until it spawns, then reset it.）
+
+[19]
+在主页面新增操控指南，让玩家知道操作方法，同样适用双语
+（Add a controls guide to the main screen so players know how to play, and make it bilingual as well.）
+
+[20]
+现在在使用牛时，前方的障碍物哪怕没有在牛的面前也会被使用技能击飞，我想将它变成障碍物必须与牛接触到或者在牛的面前才能被击飞
+（Right now, when using the cow, obstacles in the row ahead are knocked away by the skill even when they are not directly in front of the cow. I want to change it so that an obstacle must touch the cow or be directly in front of it to be knocked away.）
+
+

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8ed3c7" />
+    <title>Blocky Crossing</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="game" aria-label="Blocky Crossing game area"></main>
+
+    <section class="hud" aria-live="polite">
+      <div class="brand">BLOCKY<br />CROSSING</div>
+      <div class="scores">
+        <span><small id="score-label">SCORE</small><strong id="score">0</strong></span>
+        <span><small id="best-label">BEST</small><strong id="best">0</strong></span>
+      </div>
+    </section>
+
+    <div id="power-status" class="power-status hidden" aria-live="polite"></div>
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
+
+    <button id="skill-button" class="skill-panel" type="button" aria-label="Use the chicken's Wing Hop skill">
+      <span id="skill-icon" class="skill-icon" aria-hidden="true">🪽</span>
+      <span class="skill-copy">
+        <span id="skill-name" class="skill-name">Wing Hop</span>
+        <span id="skill-description" class="skill-description">Leap over one row</span>
+      </span>
+      <span id="skill-key" class="skill-key">Q</span>
+      <span class="skill-count">× <strong id="skill-uses">3</strong></span>
+    </button>
+
+    <section id="start-panel" class="panel">
+      <div class="mascot" aria-hidden="true">🐔</div>
+      <div class="language-picker" aria-label="Language">
+        <button class="language-choice selected" data-language="en" type="button">EN</button>
+        <button class="language-choice" data-language="zh" type="button">中文</button>
+      </div>
+      <h1 id="start-title">Ready to cross?</h1>
+      <div class="character-picker" aria-label="Choose a character">
+        <button class="character-choice selected" data-character="chicken" type="button">🐔 Chicken</button>
+        <button class="character-choice" data-character="penguin" type="button">🐧 Penguin</button>
+        <button class="character-choice" data-character="cow" type="button">🦬 Cow</button>
+      </div>
+      <div class="control-guide">
+        <div id="control-guide-title" class="guide-title">HOW TO PLAY</div>
+        <div class="guide-row">
+          <span class="guide-key wide">ARROWS / WASD</span>
+          <span id="move-hint">Move one tile</span>
+        </div>
+        <div class="guide-row">
+          <span id="guide-skill-key" class="guide-key">Q</span>
+          <span id="character-skill-hint">Use Wing Hop</span>
+        </div>
+        <div class="guide-row">
+          <span id="guide-touch-key" class="guide-key wide">SWIPE</span>
+          <span id="mobile-hint">Move on touchscreens</span>
+        </div>
+      </div>
+      <p id="item-hint" class="item-hint">Wings grant flight, crystals grant shields, and green cells recharge skills</p>
+      <button id="start-button" type="button">Start Game</button>
+    </section>
+
+    <section id="game-over-panel" class="panel hidden">
+      <div id="round-score-label" class="overline">ROUND SCORE</div>
+      <div id="final-score" class="final-score">0</div>
+      <h2 id="game-over-reason">Ouch! You got flattened!</h2>
+      <button id="restart-button" type="button">Try Again</button>
+    </section>
+
+    <div class="controls" aria-label="Touch direction controls">
+      <button data-direction="forward" aria-label="Forward">▲</button>
+      <button data-direction="left" aria-label="Left">◀</button>
+      <button data-direction="backward" aria-label="Back">▼</button>
+      <button data-direction="right" aria-label="Right">▶</button>
+    </div>
+
+    <script src="./vendor/three.min.js"></script>
+    <script src="./game.js"></script>
+    <script>
+      window.setTimeout(() => {
+        if (window.blockyCrossingReady) return;
+        const button = document.querySelector('#start-button');
+        button.textContent = 'Game failed to load';
+        button.disabled = true;
+        document.querySelector('#move-hint').textContent = 'Refresh the page. If this continues, check the browser console.';
+      }, 4000);
+    </script>
+  </body>
+</html>
