@@ -4,5 +4,6 @@ In addition to the basic gameplay of the original version, you can also use diff
 How to Play?
 Keyboard: Use the arrow keys or WASD.
 Phone/Tablet: Swipe the screen or tap the directional buttons in the bottom-left corner.
+Press Q to use the skill
 After the game ends: Click “Play Again”, or press Space / Enter.
 
