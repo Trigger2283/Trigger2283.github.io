@@ -318,14 +318,20 @@
       desc:"第三人称俯视角的 Boss Rush 游戏，主导设计了玩家成长系统，也参与了战斗机制、特效与关卡设计。" },
     { id:"next-news",        title:"The Next News",      medium:"Product design, editorial",
       year:"2023", color:0x3D5AFE, link:"next-news.html",
-      desc:"一款重新设计的新闻阅读产品，用更克制的排版和分类方式重新组织信息密度。" }
+      desc:"一款重新设计的新闻阅读产品，用更克制的排版和分类方式重新组织信息密度。" },
+    { id:"crossy-road",      title:"Blocky Road",        medium:"Game design",
+      year:"2025", color:0x4CAF6D, link:"crossyroad/index.html",
+      desc:"An AI-assisted mini game inspired by Crossy Road, featuring its own gameplay variations and unique mechanics." },
+    { id:"earthquake",       title:"Earthquake Atlas",   medium:"Web development",
+      year:"2025", color:0xC1592E, link:"earthquake/index.html",
+      desc:"An earthquake information search website integrated with the free USGS Earthquake API." }
   ];
 
   var NODE_RADIUS = 34;
   var TRIGGER_RADIUS = 5.6;
   var AWARE_RADIUS = 13.5;
   var EXIT_BUFFER = 2.2;
-  var PLAY_BOUND = 62;
+  var PLAY_BOUND = 53;
 
   PROJECTS.forEach(function(p, i){
     var angle = (i / PROJECTS.length) * Math.PI * 2 - Math.PI / 2;
@@ -384,11 +390,11 @@
   var mountainCount = 56;
   for (var mi = 0; mi < mountainCount; mi++){
     var mAngle = (mi / mountainCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.09;
-    var mRadius = 64 + Math.random() * 20;
+    var mRadius = 68 + Math.random() * 10;
     var mHeight = 16 + Math.random() * 18;
-    var mBase = 8 + Math.random() * 7;
+    var mBase = 7 + Math.random() * 4;
     var mx = Math.cos(mAngle) * mRadius, mz = Math.sin(mAngle) * mRadius;
-    var sx = 0.75 + Math.random() * 0.6, sz = 0.75 + Math.random() * 0.6;
+    var sx = 0.85 + Math.random() * 0.3, sz = 0.85 + Math.random() * 0.3;
 
     var peak = new THREE.Mesh(
       new THREE.ConeGeometry(mBase, mHeight, 6),
@@ -427,6 +433,8 @@
   });
 
   // ---------- scattered low-poly props ----------
+  // Builds one low-poly tree (trunk + cone foliage). Returns the mesh plus
+  // a collision radius/color so the caller can track it for destruction.
   function makeTree(){
     var g = new THREE.Group();
     var trunk = new THREE.Mesh(
@@ -444,6 +452,7 @@
     g.add(trunk, foliage);
     return { mesh:g, radius:0.5, color:foliageColor };
   }
+  // Builds one low-poly rock (random size/grey tone). Same return shape as makeTree.
   function makeRock(){
     var greys = [0x9C9C94, 0xB7B7A8, 0x8C8C82];
     var r = 0.35 + Math.random()*0.45;
@@ -457,6 +466,10 @@
     return { mesh:m, radius:r, color:color };
   }
 
+  // Scatter trees/rocks randomly across the play area, skipping spots too
+  // close to the spawn point, a project node, or the About node so nothing
+  // blocks the paths. propColliders tracks each prop's position/radius/state
+  // so checkPropCollisions() below can detect the car driving into one.
   var propsGroup = new THREE.Group();
   var propColliders = [];
   var placed = 0, attempts = 0;
@@ -480,8 +493,12 @@
   scene.add(propsGroup);
 
   // ---------- prop destruction ----------
+  // Active flying debris fragments spawned when a prop is destroyed.
   var fragments = [];
 
+  // Spawns `count` small colored cubes at (x,y,z) with random outward
+  // velocity/spin — the "shatter" effect used when a tree/rock is destroyed
+  // and again mid-transform. Caps total fragments to avoid unbounded growth.
   function spawnFragments(x, y, z, color, count){
     for (var i = 0; i < count; i++){
       var size = 0.12 + Math.random() * 0.16;
@@ -505,6 +522,8 @@
     }
   }
 
+  // Per-frame physics for debris: gravity, ground bounce/friction, spin,
+  // and fade-out; removes each fragment once its life reaches zero.
   function updateFragments(dt){
     for (var i = fragments.length - 1; i >= 0; i--){
       var f = fragments[i];
@@ -523,6 +542,8 @@
     }
   }
 
+  // Removes a prop from the world, bursts it into fragments, and gives the
+  // car a small speed penalty as tactile "impact" feedback.
   function destroyProp(p){
     p.destroyed = true;
     propsGroup.remove(p.mesh);
@@ -530,6 +551,8 @@
     carState.speed *= 0.8;
   }
 
+  // Checks the car's distance to every (non-destroyed) prop each frame and
+  // destroys any it has driven into. Called from updateCar().
   function checkPropCollisions(){
     for (var i = 0; i < propColliders.length; i++){
       var p = propColliders[i];
@@ -539,7 +562,52 @@
     }
   }
 
+  // ---------- rear-wheel dust ----------
+  // Small dust puffs kicked up behind the jeep's rear wheels while driving
+  // (not shown in flight mode). Each puff is a soft flat circle that drifts
+  // backward/up and grows while fading out. Spawned from updateCar(),
+  // animated every frame from animate() via updateDust().
+  var dustParticles = [];
+  var dustTimer = 0;
+  var dustColors = [0xC9BBA0, 0xBFAF90, 0xD4C6A8];
+
+  function spawnDust(x, y, z, backX, backZ){
+    var mat = new THREE.MeshBasicMaterial({
+      color: dustColors[Math.floor(Math.random() * dustColors.length)],
+      transparent:true, opacity:0.3
+    });
+    var m = new THREE.Mesh(new THREE.CircleGeometry(0.14 + Math.random() * 0.08, 7), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, y, z);
+    scene.add(m);
+    dustParticles.push({
+      mesh:m,
+      vel:new THREE.Vector3(backX * 1.2 + (Math.random()-0.5)*0.5, 0.35 + Math.random()*0.3, backZ * 1.2 + (Math.random()-0.5)*0.5),
+      life:0.65, maxLife:0.65
+    });
+  }
+
+  // Drifts/grows/fades each dust puff and removes it once its life is up.
+  function updateDust(dt){
+    for (var i = dustParticles.length - 1; i >= 0; i--){
+      var d = dustParticles[i];
+      d.mesh.position.addScaledVector(d.vel, dt);
+      d.vel.multiplyScalar(0.94);
+      d.life -= dt;
+      var t = 1 - d.life / d.maxLife;
+      var s = 1 + t * 1.6;
+      d.mesh.scale.set(s, s, s);
+      d.mesh.material.opacity = 0.3 * (1 - t);
+      if (d.life <= 0){
+        scene.remove(d.mesh); d.mesh.geometry.dispose(); d.mesh.material.dispose();
+        dustParticles.splice(i, 1);
+      }
+    }
+  }
+
   // ---------- node markers ----------
+  // Procedurally draws a soft white radial-gradient sprite on a canvas and
+  // returns it as a texture — used for the glowing particles around each node.
   function makeGlowTexture(){
     var size = 64;
     var canvas = document.createElement("canvas");
@@ -766,6 +834,8 @@
   });
 
   // roll bars (front + rear hoops)
+  // Draws a cylinder stretched and rotated to run between two 3D points —
+  // used to build the jeep's roll-bar hoops without hand-picking an angle.
   var barGeo = new THREE.CylinderGeometry(0.045, 0.045, 1, 6);
   function addBar(parent, x1, y1, z1, x2, y2, z2){
     var mid = new THREE.Vector3((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
@@ -836,12 +906,17 @@
   canopy.rotation.x = -0.1;
   planeModel.add(canopy);
 
+  // Simple rectangular panel swept back from one edge — used for the small
+  // canard fins (a full swept-quad shape is overkill for those).
   function makeSweptPanel(span, thickness, chord, side){
     var geo = new THREE.BoxGeometry(span, thickness, chord);
     geo.translate(side * span / 2, 0, 0);
     return geo;
   }
 
+  // Builds the jet's main wing as a flat swept quad: the root edge stays
+  // straight (flush against the fuselage) while only the tip sweeps back,
+  // which avoids the pinched/pointed look a simple box rotation would give.
   function makeWingGeo(side){
     var rootX = 0.2, rootFrontZ = 0.55, rootBackZ = -0.35;
     var tipX = 2.0, tipFrontZ = -0.45, tipBackZ = -1.35;
@@ -909,17 +984,20 @@
   // input
   // ---------------------------------------------------------------
   var keys = { fwd:false, back:false, left:false, right:false };
-  var flightMode = false;
-  var isTransforming = false;
-  var transformState = null;
+  var flightMode = false;      // true while the plane model is active/flying
+  var isTransforming = false;  // true during the jeep<->plane transform animation
+  var transformState = null;   // { from, to, t, switched } while transforming — see updateTransform()
   var TRANSFORM_DURATION = 0.9;
 
+  // Starts the jeep<->plane transform sequence (ignored if one is already
+  // playing). Shared by the spacebar key and the mobile double-tap handler.
   function triggerTransform(){
     if (isTransforming) return;
     isTransforming = true;
     transformState = { from: flightMode ? "plane" : "jeep", to: flightMode ? "jeep" : "plane", t:0, switched:false };
   }
 
+  // Keyboard driving controls (WASD/arrows) plus Space to transform.
   window.addEventListener("keydown", function(e){
     switch(e.key){
       case "w": case "W": case "ArrowUp": keys.fwd = true; break;
@@ -942,6 +1020,9 @@
     }
   });
 
+  // On-screen touch joystick (shown only on touch devices via CSS).
+  // Dragging it sets joyVec (-1..1 on each axis), read by updateCar() the
+  // same way keyboard input is, so both control schemes just add together.
   var joystick = document.getElementById("joystick");
   var knob = document.getElementById("joystick-knob");
   var joyVec = { x:0, y:0 };
@@ -964,6 +1045,8 @@
       knob.style.transform = "translate(0px,0px)";
     });
   });
+  // Converts the current drag position into a clamped -1..1 vector and
+  // moves the visible knob to match.
   function updateJoy(e){
     var cx = joyBaseRect.left + joyBaseRect.width/2;
     var cy = joyBaseRect.top + joyBaseRect.height/2;
@@ -977,6 +1060,8 @@
     joyVec.y = ky/max;
   }
 
+  // Fades out the top-right "how to play" hint the first time the player
+  // moves, or automatically after 5 seconds either way.
   function dismissHint(){
     var hint = document.getElementById("hint");
     if (hint) hint.classList.add("faded");
@@ -1053,6 +1138,8 @@
   var detailEnter = document.getElementById("detail-enter");
   var detailBack = document.getElementById("detail-back");
 
+  // Shows the small "confirm entry" card that slides in from the top-left
+  // when the car (or an About/project node) is approached.
   function openPrompt(node){
     activeNode = node;
     promptCard.style.setProperty("--c", node.project.cssColor);
@@ -1060,6 +1147,8 @@
     promptMedium.textContent = node.project.medium;
     promptModal.classList.remove("hidden");
   }
+  // Hides the confirm card. `withCooldown` starts a short grace period so
+  // the same node won't immediately re-trigger while still nearby.
   function closePrompt(withCooldown){
     promptModal.classList.add("hidden");
     if (withCooldown && activeNode) cooldownId = activeNode.project.id;
@@ -1070,6 +1159,9 @@
     openDetail(activeNode);
   });
 
+  // Opens the full-screen project/About detail panel and pauses driving
+  // (see animate()). Shows the "Walk in" button only when the node links
+  // to a sub-scene page.
   function openDetail(node){
     appMode = "detail";
     detailHero.style.background = node.project.cssColor;
@@ -1098,13 +1190,16 @@
   });
 
   // ---------------------------------------------------------------
-  // car physics
+  // car physics — runs every frame while driving (see animate()).
+  // Reads keyboard + joystick input, applies arcade-style acceleration/
+  // braking/turning, moves the car, and (in flight mode) handles altitude.
   // ---------------------------------------------------------------
   var carState = { x:0, z:0, y:0, heading:0, speed:0 };
   var ACCEL = 30, MAX_SPEED = 21, MAX_REVERSE = 9, FRICTION = 16, BRAKE = 38, TURN_RATE = 2.5;
   var MAX_ALT = 9, CLIMB_RATE = 4, DESCEND_RATE = 3.2;
 
   function updateCar(dt){
+    // Combine keyboard + joystick into a single -1..1 throttle/steer pair.
     var throttle = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
     throttle += -joyVec.y;
     throttle = Math.max(-1, Math.min(1, throttle));
@@ -1113,6 +1208,8 @@
     steer += joyVec.x;
     steer = Math.max(-1, Math.min(1, steer));
 
+    // Accelerate/brake: braking (opposite direction to current motion) is
+    // stronger than plain acceleration, matching real driving feel.
     if (throttle !== 0) {
       if (carState.speed !== 0 && Math.sign(throttle) !== Math.sign(carState.speed)) {
         carState.speed += throttle * BRAKE * dt;
@@ -1127,6 +1224,9 @@
     var maxSpd = flightMode ? MAX_SPEED * 1.6 : MAX_SPEED;
     carState.speed = Math.max(-MAX_REVERSE, Math.min(maxSpd, carState.speed));
 
+    // Turning is slower at low speed (speedFactor) so the car doesn't spin
+    // in place; heading -= steer because of how the camera is angled (see
+    // the steering-fix note further down for why the sign is inverted).
     var speedFactor = Math.max(0.15, Math.min(1, Math.abs(carState.speed) / maxSpd));
     carState.heading -= steer * TURN_RATE * dt * speedFactor;
 
@@ -1134,6 +1234,8 @@
     carState.x += fx * carState.speed * dt;
     carState.z += fz * carState.speed * dt;
 
+    // Soft boundary: gently push the car back toward the play area edge
+    // instead of a hard wall.
     var distC = Math.hypot(carState.x, carState.z);
     if (distC > PLAY_BOUND) {
       var s = PLAY_BOUND / distC;
@@ -1141,6 +1243,8 @@
       carState.speed *= 0.55;
     }
 
+    // Flight mode: climb while holding forward, sink otherwise; grounded
+    // (jeep) mode always stays at y = 0.
     if (flightMode) {
       if (throttle > 0.15) carState.y = Math.min(MAX_ALT, carState.y + CLIMB_RATE * dt);
       else carState.y = Math.max(0, carState.y - DESCEND_RATE * dt);
@@ -1148,6 +1252,8 @@
       carState.y = 0;
     }
 
+    // Apply the computed state to the actual 3D object: position, heading,
+    // a bit of suspension bob, and a lean/pitch that reads as "banking".
     car.position.x = carState.x;
     car.position.z = carState.z;
     car.position.y = carState.y + Math.sin(elapsed * 10) * 0.02 * speedFactor;
@@ -1155,21 +1261,49 @@
     car.rotation.z = steer * speedFactor * (flightMode ? 0.32 : 0.14);
     car.rotation.x = flightMode ? -throttle * 0.12 : 0;
 
+    // Spin the wheel meshes proportionally to speed (visual only).
     wheels.forEach(function(w){ w.rotation.x += (carState.speed / WHEEL_R) * dt; });
 
+    // Kick up small dust puffs behind the rear wheels while driving on the
+    // ground at a reasonable speed (not while flying). Positions are found
+    // by rotating the wheels' local offsets by the car's heading.
+    if (!flightMode && Math.abs(carState.speed) > 2.5){
+      dustTimer -= dt;
+      if (dustTimer <= 0){
+        dustTimer = 0.1;
+        var cosH = Math.cos(carState.heading), sinH = Math.sin(carState.heading);
+        [-0.9, 0.9].forEach(function(wx){
+          var wdx = carState.x + wx * cosH - 1.2 * fx;
+          var wdz = carState.z - wx * sinH - 1.2 * fz;
+          spawnDust(wdx, 0.1, wdz, -fx, -fz);
+        });
+      }
+    }
+
+    // Ground shadow follows the car in world space (not parented to it, so
+    // pitch/roll doesn't drag it sideways) and fades/shrinks with altitude.
     shadowBlob.position.set(carState.x, 0.06, carState.z);
     var shadowFade = Math.max(0.35, 1 - carState.y / MAX_ALT * 0.7);
     shadowBlob.scale.setScalar(shadowFade);
     shadowBlob.material.opacity = 0.22 * shadowFade;
 
+    // Only check for hitting props/nodes while flying low enough to matter.
     if (carState.y < 1.6) checkPropCollisions();
   }
 
+  // Standard "ease out back" easing curve (slight overshoot before
+  // settling) — used for the bouncy pop when the new model appears
+  // mid-transform.
   function easeOutBack(x){
     var c1 = 1.70158, c3 = c1 + 1;
     return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
   }
 
+  // Drives the transform animation frame-by-frame over TRANSFORM_DURATION:
+  // spin two full turns while the old model shrinks away (first half), then
+  // swap models and pop the new one back in with an overshoot bounce
+  // (second half). The two-full-turn spin (4*PI over the whole duration)
+  // is deliberate so the car ends facing exactly the way it started.
   function updateTransform(dt){
     var ts = transformState;
     ts.t = Math.min(TRANSFORM_DURATION, ts.t + dt);
@@ -1180,10 +1314,14 @@
     car.position.y = carState.y + Math.sin(overallP * Math.PI) * 0.7;
 
     if (overallP < 0.5) {
+      // First half: shrink the current model away to nothing.
       var p = overallP / 0.5;
       var fromGroup = ts.from === "jeep" ? jeepModel : planeModel;
       fromGroup.scale.setScalar(Math.max(0.04, 1 - p));
     } else {
+      // Midpoint: hide the old model, show the new one at minimum scale,
+      // flip flightMode, and burst a few fragments as a "poof" flourish.
+      // This block only runs once per transform (guarded by ts.switched).
       if (!ts.switched){
         var fromGroup2 = ts.from === "jeep" ? jeepModel : planeModel;
         fromGroup2.visible = false;
@@ -1196,11 +1334,14 @@
         spawnFragments(carState.x, carState.y + 0.8, carState.z, JEEP_GREEN, 10);
         ts.switched = true;
       }
+      // Second half: grow the new model back in with a bouncy overshoot.
       var p2 = (overallP - 0.5) / 0.5;
       var toGroup2 = ts.to === "jeep" ? jeepModel : planeModel;
       toGroup2.scale.setScalar(Math.max(0.04, easeOutBack(p2)));
     }
 
+    // Once finished, snap every value to its clean final state (guards
+    // against any accumulated floating-point drift) and end the animation.
     if (ts.t >= TRANSFORM_DURATION){
       car.rotation.y = carState.heading;
       car.rotation.z = 0;
@@ -1213,7 +1354,9 @@
   }
 
   // ---------------------------------------------------------------
-  // node proximity checks
+  // node proximity checks — runs every frame. Animates each node's
+  // floating gem/particles/label, and opens the confirm prompt (or lets
+  // it auto-close) based on the car's distance to each node.
   // ---------------------------------------------------------------
   function updateNodes(dt){
     nodeMarkers.forEach(function(n){
@@ -1264,14 +1407,21 @@
 
   // ---------------------------------------------------------------
   // camera + loop
+  // Fixed-angle "Hades style" chase camera: it never rotates with the car,
+  // only translates to follow it (with a lerp for smoothing), which is why
+  // the world's left/right ends up mirrored on screen — see the steering
+  // note in updateCar().
   // ---------------------------------------------------------------
   var camPos = new THREE.Vector3(CAM_OFFSET.x, CAM_OFFSET.y, CAM_OFFSET.z);
   var clock = new THREE.Clock();
   var elapsed = 0;
 
+  // Main per-frame loop: advance whichever state machine is active
+  // (transform animation takes priority over normal driving), move the
+  // camera to follow, then update nodes/debris and render.
   function animate(){
     requestAnimationFrame(animate);
-    var dt = Math.min(clock.getDelta(), 0.05);
+    var dt = Math.min(clock.getDelta(), 0.05); // clamp to avoid big jumps after a stall
     elapsed += dt;
 
     if (isTransforming) updateTransform(dt);
@@ -1285,6 +1435,7 @@
 
     updateNodes(dt);
     updateFragments(dt);
+    updateDust(dt);
 
     renderer.render(scene, camera);
   }

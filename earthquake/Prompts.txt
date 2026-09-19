@@ -1,0 +1,13 @@
+1, I want to create a small earthquake-related application. At the moment, the most suitable API I have found is the USGS Earthquake API. At the same time, I want to make sure that no potentially private information, such as addresses, can be leaked when using this application. I want such information to be isolated separately and prevented from being uploaded. Please tell me how I should do this.
+
+2, I want to use this API and make the earthquake information easier to understand visually. Do you have any good suggestions?
+
+3, Okay, then please help me build a website like this: all in all, I want to use USGS to obtain earthquake data, and this website allow users to filter the data by level, time, and distance, and also include a map so they can locate the corresponding specific places. However, please continue to pay attention to user privacy protection.
+
+4, Please make it bilingual in Chinese and English, and provide the corresponding settings options on the homepage.
+
+5, How can I protect users’ IP addresses while they are using this website?
+
+6, Can you remove this unnecessary button related to location?
+
+7, Does the name of my website have to be “index”?
