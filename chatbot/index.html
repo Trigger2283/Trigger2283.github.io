@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>我的 AI 聊天室</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f6fa; color: #182237; font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 820px; margin: 36px auto; padding: 24px; }
+    h1 { margin-bottom: 4px; }
+    .hint { color: #52627a; font-size: 14px; }
+    label { display: block; margin: 16px 0 6px; }
+    input, textarea { width: 100%; border: 1px solid #bcc8d9; border-radius: 10px; padding: 12px; font: inherit; }
+    #messages { min-height: 260px; margin: 24px 0; padding: 18px; background: white; border-radius: 16px; }
+    .message { padding: 12px 14px; margin: 10px 0; background: #f0f3f8; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .user { background: #e8edff; }
+    .actions { display: flex; gap: 12px; margin-top: 12px; }
+    button { background: #355cdd; color: white; border: 0; border-radius: 9px; padding: 10px 20px; font: inherit; cursor: pointer; }
+    button.secondary { background: #e2e7f0; color: #23324d; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { min-height: 26px; color: #8a361e; }
+    @media (max-width: 600px) { main { margin: 0 auto; padding: 18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <a href="/">← 返回作品集</a>
+  <h1>我的 AI 聊天室</h1>
+  <p class="hint">从一句「你好」开始。聊天内容会发送给 OpenAI；刷新页面会清空本页对话。</p>
+  <label for="password">访问口令</label>
+  <input id="password" type="password" autocomplete="off" placeholder="输入你设置的聊天口令，不是 OpenAI API 密钥">
+  <div id="messages" role="log" aria-live="polite" aria-label="聊天记录">
+    <p class="hint" id="welcome">准备好了，输入你的第一条消息吧。</p>
+  </div>
+  <form id="chat-form">
+    <label for="message">你的消息</label>
+    <textarea id="message" rows="3" maxlength="4000" required placeholder="例如：用简单的话解释什么是后端"></textarea>
+    <div class="actions">
+      <button id="send" type="submit">发送消息</button>
+      <button id="clear" type="button" class="secondary">新对话</button>
+    </div>
+  </form>
+  <p id="status" role="status"></p>
+  <p class="hint">为控制单次请求大小，每次最多携带最近 5 轮对话。AI 的回答可能有误。</p>
+</main>
+<script src="./config.js"></script>
+<script>
+  const history = [];
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('message');
+  const password = document.getElementById('password');
+  const messages = document.getElementById('messages');
+  const status = document.getElementById('status');
+  const send = document.getElementById('send');
+  const clear = document.getElementById('clear');
+  function showMessage(role, content) {
+    document.getElementById('welcome')?.remove();
+    const item = document.createElement('div');
+    item.className = 'message ' + role;
+    item.textContent = (role === 'user' ? '你：' : 'AI：') + content;
+    messages.appendChild(item);
+    item.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  }
+  clear.addEventListener('click', () => {
+    history.length = 0;
+    messages.replaceChildren();
+    status.textContent = '已开始新对话。';
+    input.focus();
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (send.disabled) return;
+    const content = input.value.trim();
+    if (!content) return;
+    const backendUrl = window.CHAT_CONFIG?.backendUrl?.replace(/\/+$/, '');
+    if (!backendUrl || backendUrl.includes('YOUR-BACKEND')) {
+      status.textContent = '请先在前端 config.js 中填写 Render 后端地址。';
+      return;
+    }
+    if (!password.value) {
+      status.textContent = '请先输入访问口令。';
+      password.focus();
+      return;
+    }
+    // 保留完整对话轮次，并限制总长度。
+    const recent = history.slice(-10);
+    while (recent.reduce((n, m) => n + m.content.length, content.length) > 24000) {
+      recent.splice(0, 2);
+    }
+    send.disabled = clear.disabled = input.disabled = true;
+    status.textContent = '正在等待回复，首次连接可能需要唤醒服务，请稍候…';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 150000);
+    try {
+      const response = await fetch(backendUrl + '/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Chat-Password': password.value},
+        body: JSON.stringify({messages: [...recent, {role: 'user', content}]}),
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '服务暂时不可用，请稍后重试。');
+      if (typeof data.reply !== 'string' || !data.reply) throw new Error('未收到有效回复，请重试。');
+      history.push({role: 'user', content}, {role: 'assistant', content: data.reply});
+      showMessage('user', content);
+      showMessage('assistant', data.reply);
+      input.value = '';
+      status.textContent = '';
+    } catch (error) {
+      status.textContent = error.name === 'AbortError'
+        ? '等待超时，后端可能正在唤醒，请稍后重试。'
+        : error instanceof TypeError
+          ? '无法连接后端，请检查网络、后端地址和跨域设置。'
+          : error.message;
+    } finally {
+      clearTimeout(timer);
+      send.disabled = clear.disabled = input.disabled = false;
+      input.focus();
+    }
+  });
+</script>
+</body>
+</html>
